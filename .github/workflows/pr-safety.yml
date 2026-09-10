@@ -38,6 +38,7 @@ jobs:
           node --check src/life-engine.js
           node --check src/visual-engine.js
           node --check src/cinema-engine.js
+          node --check src/cinema-background.js
           node --check public/runtime-v14.js
           node --check public/avatar-runtime-v15.js
           node --check public/reset-runtime-v16.js
@@ -47,6 +48,7 @@ jobs:
           node --check public/core-runtime-v21.js
           node --check public/continuity-runtime-v22.js
           node --check public/cinema-runtime-v23.js
+          node --check public/cinema-background-v23.js
           node --check preflight.mjs
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
