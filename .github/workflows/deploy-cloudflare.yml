@@ -9,7 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -23,15 +23,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run V13 preflight
-        run: npm run check
+      - name: Ten-pass V13 preflight and Wrangler dry-run
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 10); do
+            echo "=== validation pass $i/10 ==="
+            npm run check
+            rm -rf .wrangler-dry-run
+            npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+          done
 
-      - name: Validate Wrangler packaging
-        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+      - name: Require Cloudflare API token
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN repository secret is required for the final Cloudflare deployment."
+            exit 1
+          fi
 
-      - name: Deploy to Cloudflare
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          wranglerVersion: '4'
-          command: deploy
+      - name: Prepare Cloudflare resources, migrate D1, and deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:prepare
+
+      - name: Verify deployed V13 end to end
+        run: npm run deploy:verify
