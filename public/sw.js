@@ -1,4 +1,4 @@
-const CACHE="my-life-room-v23-cinema-shell";
+const CACHE="my-life-room-v22-shell";
 const BUILD="visualfix1";
 const PATCH="cleanup2";
 const CINEMA="pilot1";
