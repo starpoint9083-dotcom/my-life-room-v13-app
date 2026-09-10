@@ -34,6 +34,7 @@ jobs:
           node --check public/reset-runtime-v16.js
           node --check public/visual-runtime-v17.js
           node --check public/room-runtime-v19.js
+          node --check public/pose-runtime-v20.js
           node --check preflight.mjs
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
