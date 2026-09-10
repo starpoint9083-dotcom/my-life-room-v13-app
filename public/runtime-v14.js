@@ -38,9 +38,12 @@ function mount(){
 }
 function render(s){
   liveSummary=s||liveSummary;if(!liveSummary)return;
-  const dry=byId("dryStat"),smoke=byId("smokeStat");
+  const dry=byId("dryStat"),smoke=byId("smokeStat"),savedEl=byId("saved");
+  const actualSaved=Math.max(0,Number(liveSummary.savedEstimate||0));
   if(dry)dry.textContent=`${liveSummary.dryStreak||0}일`;
   if(smoke)smoke.textContent=`${liveSummary.smokeStreak||0}일`;
+  if(savedEl){savedEl.textContent=`${actualSaved.toLocaleString()}원`;savedEl.title="실사용 시작일과 실제 기준금액으로 계산";}
+  try{if(typeof saved!=="undefined")saved=actualSaved}catch{}
   const state=byId("liveEngineState");if(state)state.textContent="서버 동기화";
   const note=byId("liveEngineNote");
   if(note){
@@ -50,10 +53,6 @@ function render(s){
     if(t?.smoking_count!==null&&t?.smoking_count!==undefined)parts.push(`담배 ${t.smoking_count}개비`);
     if(t?.condition_score!==null&&t?.condition_score!==undefined)parts.push(`컨디션 ${t.condition_score}/10`);
     note.innerHTML=parts.length?`오늘 실제 기록: <span class="liveStrong">${esc(parts.join(" · "))}</span>`:"오늘 실제 기록은 아직 없습니다.";
-  }
-  if(Number(liveSummary.savedEstimate)>0){
-    const savedEl=byId("saved");
-    if(savedEl)savedEl.title=`실사용 시작일 기준 예상 절약액 ${Number(liveSummary.savedEstimate).toLocaleString()}원`;
   }
 }
 async function refresh(){
@@ -125,6 +124,9 @@ async function syncCondition(score){
   try{await api("/api/life/condition",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({date:localDate(),score:Number(score)})});await refresh()}catch{}
 }
 function wrap(){
+  if(typeof window.updateStats==="function"&&!window.updateStats.__live){
+    const old=window.updateStats;const fn=function(){const r=old.apply(this,arguments);if(liveSummary){render(liveSummary);try{if(typeof saveState==="function")saveState()}catch{}}return r};fn.__live=true;window.updateStats=fn;
+  }
   if(typeof window.setDay==="function"&&!window.setDay.__live){
     const old=window.setDay;const fn=function(x){const r=old.apply(this,arguments);syncDaily(x);return r};fn.__live=true;window.setDay=fn;
   }
