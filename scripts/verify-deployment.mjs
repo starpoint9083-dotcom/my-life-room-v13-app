@@ -10,12 +10,13 @@ base=base.replace(/\/$/,"");
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const specs=[
-  ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")],
-  ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"],
+  ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")&&b.includes("/reset-runtime-v16.js")],
+  ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"&&d?.resetEngine==="v16"],
   ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
-  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("AbortController")&&b.includes("실패한 후보만 이어서")&&b.includes("fullReset")&&b.includes("/api/life/reset")],
+  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("AbortController")&&b.includes("실패한 후보만 이어서")],
+  ["reset-runtime","/reset-runtime-v16.js",(r,d,b)=>b.includes("fullReset")&&b.includes("/api/life/reset")&&b.includes("localStorage.clear()")&&b.includes("window.resetAll=fullReset")],
   ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
-  ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v15-shell")&&b.includes("/avatar-runtime-v15.js")]
+  ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v16-shell")&&b.includes("/avatar-runtime-v15.js")&&b.includes("/reset-runtime-v16.js")]
 ];
 
 async function runCheck(name,path,predicate){
@@ -43,6 +44,18 @@ async function jsonCall(path,{method="GET",body,headers={}}={}){
   return d;
 }
 
+async function saveTestAvatar(deviceId,deviceToken){
+  const fd=new FormData();
+  fd.append("image",new Blob(["reset-r2-test"],{type:"image/jpeg"}),"reset-test.jpg");
+  fd.append("style","나답게");
+  fd.append("device_id",deviceId);
+  fd.append("device_token",deviceToken);
+  const r=await fetch(base+"/api/avatar/save",{method:"POST",body:fd,cache:"no-store"});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.ok||d.stored!==true||!d.key)throw new Error(`R2 test avatar save failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);
+  return d;
+}
+
 async function verifyLifeEngine(){
   const suffix=`${Date.now()}-${Math.floor(Math.random()*1e6)}`;
   const deviceId=`ci-verify-${suffix}`;
@@ -59,25 +72,30 @@ async function verifyLifeEngine(){
   await jsonCall("/api/state",{method:"POST",headers:auth,body:{state:{habit:"둘 다",P:999,saved:12345}}});
   await jsonCall("/api/event",{method:"POST",headers:auth,body:{type:"ci-reset-test",payload:{ok:true}}});
   await jsonCall("/api/signal",{method:"POST",headers:auth,body:{kind:"smoking_count",amount:3,local_hour:20,weekday:4,meta:{ci:true}}});
+  const avatar=await saveTestAvatar(deviceId,deviceToken);
 
   const d=await jsonCall(`/api/life/summary?date=${date}`,{headers:auth});
   const s=d.summary||{},t=s.today||{};
   const ok=s.dryStreak>=1&&s.smokeStreak>=1&&t.alcohol_result==="success"&&Number(t.smoking_count)===0&&Number(t.condition_score)===8&&s.latestMessage==="CI live-room verification message";
   if(!ok)throw new Error(`life engine state mismatch before reset: ${JSON.stringify(s).slice(0,600)}`);
   console.log(`PASS life-engine D1 read/write streaks dry=${s.dryStreak} smoke=${s.smokeStreak}`);
+  console.log(`PASS R2 avatar saved before reset key=${avatar.key}`);
 
   const reset=await jsonCall("/api/life/reset",{method:"POST",headers:auth});
   if(reset.reset!==true)throw new Error(`reset endpoint did not confirm reset: ${JSON.stringify(reset)}`);
+  if(Number(reset.r2Deleted)<1)throw new Error(`reset did not delete R2 avatar: ${JSON.stringify(reset)}`);
 
-  const stateAfter=await jsonCall("/api/state",{headers:auth});
+  const alternateToken=`ci.alt.${crypto.randomUUID().replaceAll("-","")}.${crypto.randomUUID().replaceAll("-","")}`;
+  const altAuth={"x-device-id":deviceId,"x-device-token":alternateToken,"content-type":"application/json"};
+  const stateAfter=await jsonCall("/api/state",{headers:altAuth});
   if(stateAfter.state!==null)throw new Error(`state survived reset: ${JSON.stringify(stateAfter.state).slice(0,300)}`);
-  const summaryAfter=(await jsonCall(`/api/life/summary?date=${date}`,{headers:auth})).summary||{};
+  const summaryAfter=(await jsonCall(`/api/life/summary?date=${date}`,{headers:altAuth})).summary||{};
   if(summaryAfter.profile!==null||summaryAfter.today!==null||summaryAfter.latestMessage!==null||Number(summaryAfter.dryStreak)!==0||Number(summaryAfter.smokeStreak)!==0||Number(summaryAfter.savedEstimate)!==0){
     throw new Error(`life data survived reset: ${JSON.stringify(summaryAfter).slice(0,600)}`);
   }
-  const riskAfter=(await jsonCall("/api/risk-profile",{headers:auth})).profile||{};
+  const riskAfter=(await jsonCall("/api/risk-profile",{headers:altAuth})).profile||{};
   if(Number(riskAfter.sampleCount)!==0)throw new Error(`habit signals survived reset: ${JSON.stringify(riskAfter)}`);
-  console.log("PASS full reset clears app state, life data, events/signals identity state");
+  console.log("PASS full reset clears D1 state/life/signals, R2 avatar, and old device auth");
 }
 
 let last=[];
