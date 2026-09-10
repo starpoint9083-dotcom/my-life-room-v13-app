@@ -1,6 +1,7 @@
 import fs from "node:fs";
 const html=fs.readFileSync("public/index.html","utf8");
 const runtime=fs.readFileSync("public/runtime-v14.js","utf8");
+const avatarRuntime=fs.readFileSync("public/avatar-runtime-v15.js","utf8");
 const worker=fs.readFileSync("src/index.js","utf8");
 const life=fs.readFileSync("src/life-engine.js","utf8");
 const sql1=fs.readFileSync("migrations/0001_init.sql","utf8");
@@ -28,14 +29,19 @@ for(const t of ["device_auth","habit_signals"]){if(!sql2.includes(`CREATE TABLE 
 for(const t of ["life_profiles","life_daily","clear_messages"]){if(!sql3.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`)}
 for(const key of ["const ACTIONS = [","const HIDDEN_CHANGES=[","const ASSET_MANIFEST ="]){if(!html.includes(key))errors.push(`missing engine ${key}`)}
 for(const key of ["실사용 엔진","맑은 나의 메시지","syncDaily","syncSmoking","syncCondition","riskTick"]){if(!runtime.includes(key))errors.push(`missing runtime feature ${key}`)}
+for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","38000","실패한 후보만 이어서"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar resilience ${key}`)}
 if(!worker.includes("crypto.subtle.digest"))errors.push("device token hashing missing");
 if(!worker.includes("env.DB"))errors.push("worker D1 binding usage missing");
 if(!worker.includes("env.AVATAR_ASSETS"))errors.push("worker R2 binding usage missing");
 if(!worker.includes("handleLifeRoute"))errors.push("life engine route bridge missing");
+if(!worker.includes("AI_TIMEOUT_MS"))errors.push("server AI timeout missing");
+if(!worker.includes("variantRaw"))errors.push("single avatar variant mode missing");
 if(!worker.includes("/runtime-v14.js"))errors.push("live runtime injection missing");
+if(!worker.includes("/avatar-runtime-v15.js"))errors.push("avatar runtime injection missing");
 if(manifest.display!=="standalone")errors.push("PWA manifest invalid");
 if(!sw.includes("serviceWorker")&&!sw.includes("fetch"))errors.push("service worker invalid");
-for(const f of ["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","src/life-engine.js","public/runtime-v14.js","migrations/0003_life_engine.sql"]){
+if(!sw.includes("/avatar-runtime-v15.js"))errors.push("avatar runtime offline cache missing");
+for(const f of ["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","src/life-engine.js","public/runtime-v14.js","public/avatar-runtime-v15.js","migrations/0003_life_engine.sql"]){
   if(!fs.existsSync(f))errors.push(`missing deploy file ${f}`);
 }
 if(wrangler.name!==settings.worker_name)errors.push(`worker name mismatch: ${wrangler.name} != ${settings.worker_name}`);
@@ -50,4 +56,4 @@ for(const needle of ["/api/health", "d?.ai===true", "d?.d1===true", "d?.r2===tru
   if(!verify.includes(needle))errors.push(`verify script missing ${needle}`);
 }
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
-console.log("V13 live-room preflight passed");
+console.log("V13 live-room + avatar-v15 preflight passed");
