@@ -75,7 +75,7 @@ async function upsertDaily(env,deviceId,date,patch){
     "INSERT INTO life_daily (device_id,local_date,alcohol_result,smoking_count,smoking_baseline,condition_score,updated_at) VALUES (?1,?2,?3,?4,?5,?6,datetime('now')) ON CONFLICT(device_id,local_date) DO UPDATE SET alcohol_result=excluded.alcohol_result,smoking_count=excluded.smoking_count,smoking_baseline=excluded.smoking_baseline,condition_score=excluded.condition_score,updated_at=datetime('now')"
   ).bind(deviceId,date,next.alcohol_result,next.smoking_count,next.smoking_baseline,next.condition_score).run();
 }
-async function resetDevice(env,deviceId){
+async function deleteAvatarAssets(env,deviceId){
   let r2Deleted=0;
   if(env.AVATAR_ASSETS){
     const rows=await env.DB.prepare("SELECT r2_key FROM avatars WHERE device_id=?1").bind(deviceId).all();
@@ -84,6 +84,18 @@ async function resetDevice(env,deviceId){
       try{await env.AVATAR_ASSETS.delete(key);r2Deleted++;}catch{}
     }
   }
+  return r2Deleted;
+}
+async function resetSetup(env,deviceId){
+  const r2Deleted=await deleteAvatarAssets(env,deviceId);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM avatars WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM app_state WHERE device_id=?1").bind(deviceId)
+  ]);
+  return {r2Deleted};
+}
+async function resetFull(env,deviceId){
+  const r2Deleted=await deleteAvatarAssets(env,deviceId);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM clear_messages WHERE device_id=?1").bind(deviceId),
     env.DB.prepare("DELETE FROM life_daily WHERE device_id=?1").bind(deviceId),
@@ -106,8 +118,10 @@ export async function handleLifeRoute(request,env,ensureAuth,json){
   const refDate=safeDate(url.searchParams.get("date"))||todaySeoul();
 
   if(url.pathname==="/api/life/reset"&&request.method==="POST"){
-    const result=await resetDevice(env,deviceId);
-    return json({ok:true,reset:true,...result});
+    const b=await request.json().catch(()=>({}));
+    const scope=b?.scope==="full"?"full":"setup";
+    const result=scope==="full"?await resetFull(env,deviceId):await resetSetup(env,deviceId);
+    return json({ok:true,reset:true,scope,...result});
   }
   if(url.pathname==="/api/life/summary"&&request.method==="GET"){
     return json({ok:true,summary:await summary(env,deviceId,refDate)});
