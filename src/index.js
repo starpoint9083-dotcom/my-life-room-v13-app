@@ -150,6 +150,7 @@ async function assetResponseWithRuntime(request,env){
   let scripts="";
   if(!html.includes("/runtime-v14.js"))scripts+='<script src="/runtime-v14.js" defer></script>';
   if(!html.includes("/avatar-runtime-v15.js"))scripts+='<script src="/avatar-runtime-v15.js" defer></script>';
+  if(!html.includes("/reset-runtime-v16.js"))scripts+='<script src="/reset-runtime-v16.js" defer></script>';
   if(!scripts)return new Response(html,response);
   const injected=html.includes("</body>")?html.replace("</body>",scripts+"</body>"):html+scripts;
   const headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");
@@ -159,7 +160,7 @@ async function assetResponseWithRuntime(request,env){
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
-    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true,avatarEngine:"v15"});
+    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true,avatarEngine:"v15",resetEngine:"v16"});
     if(url.pathname==="/api/avatar/generate"&&request.method==="POST")return generateAvatar(request,env);
     if(url.pathname==="/api/avatar/save"&&request.method==="POST")return saveAvatar(request,env);
     if(url.pathname==="/api/state"&&request.method==="GET")return getState(request,env);
