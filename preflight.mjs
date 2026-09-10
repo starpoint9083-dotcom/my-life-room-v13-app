@@ -53,7 +53,8 @@ for(const mark of ['resetEngine:"v16"','visualEngine:"v17"','roomEngine:"v19"','
 if(manifest.display!=="standalone")errors.push("PWA manifest invalid");
 if(!sw.includes("serviceWorker")&&!sw.includes("fetch"))errors.push("service worker invalid");
 for(const f of ["/avatar-runtime-v15.js","/reset-runtime-v16.js","/visual-runtime-v17.js","/room-runtime-v19.js","/pose-runtime-v20.js","/core-runtime-v21.js","/continuity-runtime-v22.js"]){if(!sw.includes(f))errors.push(`offline cache missing ${f}`)}
-if(!sw.includes("my-life-room-v22-visualfix1-shell"))errors.push("service worker cache is missing visualfix1 generation");
+if(!sw.includes("my-life-room-v22-shell"))errors.push("service worker cache version is not v22");
+if(!sw.includes('const BUILD="visualfix1"'))errors.push("service worker visualfix1 build marker missing");
 for(const f of ["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","src/life-engine.js","src/visual-engine.js","public/runtime-v14.js","public/avatar-runtime-v15.js","public/reset-runtime-v16.js","public/visual-runtime-v17.js","public/room-runtime-v19.js","public/pose-runtime-v20.js","public/core-runtime-v21.js","public/continuity-runtime-v22.js","migrations/0003_life_engine.sql"]){if(!fs.existsSync(f))errors.push(`missing deploy file ${f}`)}
 if(wrangler.name!==settings.worker_name)errors.push(`worker name mismatch: ${wrangler.name} != ${settings.worker_name}`);
 if(wrangler.main!=="src/index.js")errors.push("wrangler main entry invalid");
