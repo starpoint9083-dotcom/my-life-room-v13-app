@@ -1,3 +1,5 @@
+import {handleVisualRoute} from "./visual-engine.js";
+
 function safeDate(value){
   const s=String(value||"").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:null;
@@ -95,6 +97,8 @@ async function resetDevice(env,deviceId){
   return {r2Deleted};
 }
 export async function handleLifeRoute(request,env,ensureAuth,json){
+  const visual=await handleVisualRoute(request,env,ensureAuth,json);
+  if(visual)return visual;
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/api/life/"))return null;
   const auth=await ensureAuth(request,env,true); if(!auth.ok)return auth.response;
