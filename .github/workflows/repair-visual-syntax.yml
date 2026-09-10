@@ -1,0 +1,54 @@
+name: Repair visual syntax once
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/repair-visual-syntax.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Repair the known visual-engine syntax defect
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/visual-engine.js')
+          s = p.read_text()
+          old = 'level=Math.max(1,Math.min(4,Math.round(Number(b.level)||1)),time='
+          new = 'level=Math.max(1,Math.min(4,Math.round(Number(b.level)||1))),time='
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
+              print('Repaired missing closing parenthesis in ensureShared().')
+          elif new in s:
+              print('Target syntax is already repaired.')
+          else:
+              raise SystemExit('Expected syntax pattern was not found; refusing an unsafe guess.')
+          PY
+
+      - name: Check JavaScript syntax family
+        run: |
+          set -euo pipefail
+          find src public scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+          node --check preflight.mjs
+
+      - name: Commit repaired source
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/visual-engine.js; then
+            echo 'No source change required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/visual-engine.js
+          git commit -m 'Fix visual engine syntax before deployment'
+          git push
