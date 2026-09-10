@@ -1,0 +1,90 @@
+(plantN-1)%10]+(hiddenChange?' · 발견: '+hiddenChange.label:''));renderHiddenProps();
+}
+function badge(){
+  const target=todayHidden.length||0;
+  const found=foundHiddenIds.length;
+  const badgeEl=document.getElementById('badge');
+  if(badgeEl){
+    badgeEl.textContent=target===0
+      ? (day==='slip'?'오늘은 잠시 흐린 하루':'오늘 변화 없음')
+      : (found>=target?'오늘 변화 모두 찾음 ✓':`오늘 작은 변화 ${target-found}개 남음`);
+  }
+  if(target>0&&found>=target&&!window._hiddenRewarded){
+    window._hiddenRewarded=true;
+    P+=30;
+    addGrowth(4,'✨ 숨은 변화 모두 발견! 방 성장 +4');
+    updateStats();
+  }
+}
+function autoTime(){const h=new Date().getHours();let t=h<6?'night':h<9?'morning':h<18?'day':h<20?'return':h<23?'evening':'night';setTime(t,null)}
+function setTime(t,btn){
+ currentTime=t;document.querySelectorAll('.times button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');
+ const room=document.getElementById('room'),a=document.getElementById('avatar');room.classList.remove('evening','night');a.classList.remove('away');
+ if(t==='morning'){show('좋은 아침이에요. 오늘의 작은 변화를 찾아보세요.')}
+ if(t==='leave'){show('출근 준비 중이에요. 잠시 후 본캐가 방을 나갑니다.');setTimeout(()=>a.classList.add('away'),650)}
+ if(t==='day'){a.classList.add('away');show('본캐는 출근 중. 방에는 펫과 식물이 하루를 보내고 있어요.')}
+ if(t==='return'){room.classList.add('evening');const greet=choosePetAction();show('퇴근했어요. '+petMode+' 펫이 반겨요: '+greet)}
+ if(t==='evening'){room.classList.add('evening');show('저녁 휴식 시간. 위험시간 개입은 방을 막지 않고 조용히 나타납니다.')}
+ if(t==='night'){room.classList.add('night');show('밤이에요. 사람과 펫 모두 움직임이 차분해집니다.')}
+ refreshEngineState();renderRisk();applySceneAssets();renderHiddenProps();saveState()
+}
+function setDay(x){
+ day=x;hidden=0;const room=document.getElementById('room');room.classList.remove('rain');document.getElementById('newleaf').style.display='none';
+ if(x==='success'){document.getElementById('badge').textContent='내일 좋은 변화 2개 예약';addGrowth(5);logEvent('daily_result',{result:'success'});recordHabitSignal('daily_success',1);show('✨ 완전 성공. 내일 아침 좋은 변화 2개가 숨어 있고 방 성장도도 올라갑니다.')}
+ if(x==='reduce'){document.getElementById('badge').textContent='내일 좋은 변화 1개 예약';addGrowth(2);logEvent('daily_result',{result:'reduce'});show('🌱 평균보다 줄였습니다. 내일 작은 좋은 변화 1개와 소폭 성장이 생깁니다.')}
+ if(x==='slip'){room.classList.add('rain');document.getElementById('badge').textContent='오늘은 잠시 흐린 하루';logEvent('daily_result',{result:'slip'});recordHabitSignal('daily_slip',1);show('🌧 비가 온 하루였습니다. 방 성장도와 지금까지 만든 삶은 그대로 유지됩니다.')}
+ window._hiddenRewarded=false;prepareHiddenChanges();refreshEngineState();saveState()
+}
+function openSheet(h){document.getElementById('sheet').innerHTML=h;document.getElementById('overlay').classList.add('show')}
+function closeSheet(){document.getElementById('overlay').classList.remove('show');if(timerId){clearInterval(timerId);timerId=null}}
+function openMorning(){openSheet(`<h2>좋은 아침이에요 ☀️</h2><p>기록부터 묻지 않습니다. 먼저 어제의 선택이 무엇을 바꿨는지 봅니다.</p><div class="message"><b>어젯밤의 내가, 오늘의 나를 지켰습니다.</b><br><br>방 안에 작은 변화가 숨어 있어요.</div><button class="big" onclick="closeSheet();toast('방에서 숨은 변화를 찾아보세요.')">숨은 변화 찾기</button><button class="big alt" onclick="condition()">컨디션 먼저 기록</button>`)}
+function condition(){openSheet(`<h2>지금 컨디션은?</h2><p>한 번만 눌러주세요.</p><div class="row">${[2,4,6,8,10].map(n=>`<button class="chip" onclick="saveCond(${n})">${n}</button>`).join('')}</div><button class="big alt" onclick="closeSheet()">건너뛰기</button>`)}
+function saveCond(n){P+=10;updateStats();closeSheet();toast(`컨디션 ${n}점 저장 +10P`)}
+function openAlcohol(){openSheet(`<h2>한 시간 뒤, 흔들릴 수 있어요.</h2><p>평소 술 시간보다 조금 먼저 찾아왔습니다.</p><div class="message"><b>맑았던 내가 지금의 나에게</b><br><br>“밤의 나야, 한 잔이 당기는 거 알아. 오늘은 마시기 전에 다른 선택을 해보자.”</div><button class="big" onclick="alcoholNo()">오늘은 마시지 않는다</button><button class="big alt" onclick="startTimer(10,'금주')">10분만 더 생각한다</button><button class="big alt" onclick="plan()">오늘 약속이 있다</button>`)}
+function alcoholNo(){P+=20;saved+=alcoholCost;recordHabitSignal('alcohol_defense_success',1);updateStats();closeSheet();toast('위험시간 방어 선택 +20P')}
+function plan(){openSheet(`<h2>어떤 자리인가요?</h2><p>상황에 맞춰 짧은 방어 계획을 잡습니다.</p><button class="big alt" onclick="planDone('회식')">회식</button><button class="big alt" onclick="planDone('친구 모임')">친구 모임</button><button class="big alt" onclick="planDone('혼술 위험')">혼술 위험</button>`)}
+function planDone(x){P+=15;recordHabitSignal('alcohol_plan',1,{type:x});updateStats();closeSheet();toast(`${x} 방어 계획 +15P`)}
+function openSmoking(){openSheet(`<h2>지금 담배 생각이 나나요?</h2><p>금연은 짧고 자주 개입합니다.</p><div class="message">한 개비를 참는 게 아니라 <b>3분만 넘겨보세요.</b></div><button class="big" onclick="startTimer(3,'금연')">3분 버티기</button><button class="big alt" onclick="smokeCount()">오늘 개비 수 기록</button>`)}
+function startTimer(min,type){let sec=min*60;openSheet(`<h2>${type} 방어 모드</h2><div class="timer" id="timer">${min}:00</div><button class="big alt" onclick="finishTimer('${type}')">데모: 지금 완료 처리</button>`);timerId=setInterval(()=>{sec--;const el=document.getElementById('timer');if(el)el.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;if(sec<=0)finishTimer(type)},1000)}
+function finishTimer(type){if(timerId){clearInterval(timerId);timerId=null}P+=type==='금연'?15:25;recordHabitSignal(type==='금연'?'smoking_defense_success':'alcohol_defense_success',1);updateStats();closeSheet();toast(`${type} 방어 성공! 작은 보상 지급`)}
+function smokeCount(){openSheet(`<h2>오늘 몇 개비였나요?</h2><p>현재 기준은 하루 ${smokeBase}개비입니다. 평균보다 줄인 것도 인정합니다.</p><div class="row">${[smokeBase,Math.round(smokeBase*.75),Math.round(smokeBase*.5),Math.max(1,Math.round(smokeBase*.25)),0].map(n=>`<button class="chip" onclick="smokeResult(${n},${smokeBase})">${n}</button>`).join('')}</div>`)}
+function smokeResult(n,base){let gain=0,msg='';const ratio=base>0?n/base:0;if(n===0){gain=100;msg='완전 금연 — 최대 보상'}else if(ratio<=.25){gain=75;msg='크게 줄였어요 — 큰 보상'}else if(ratio<=.5){gain=50;msg='절반 이상 감량 — 중간 보상'}else if(n<base){gain=25;msg='평균보다 줄였어요 — 작은 보상'}else msg='기준과 같아요 — 감량 보상 없음';P+=gain;recordHabitSignal('smoking_count',n,{baseline:base});updateStats();closeSheet();toast(msg+(gain?` +${gain}P`:''))}
+function firstThree(){const combos=[["눈을 깜빡이며 화면을 바라봐요","가볍게 손을 흔들어요","살짝 미소 지어요"],["고개를 들어 주변을 봐요","펫 쪽으로 몸을 기울여요","편안하게 웃어요"],["창밖을 바라봐요","화면 쪽으로 시선을 돌려요","고개를 작게 끄덕여요"],["작게 하품해요","기지개를 켜요","편안하게 자세를 잡아요"]];const c=rand(combos);let i=0;const f=()=>{if(i>=3){show('첫 살아 있음 3동작 완료. 이제 직접 눌러보세요.');return}anim(document.getElementById('avatar'),['nod','wig','bob'][i]);show('✨ '+c[i]);i++;setTimeout(f,900)};setTimeout(f,550)}
+
+async function checkAI(){
+      if(location.protocol==='file:') return;
+      try{
+        const r=await fetch('/api/health');const d=await r.json();
+        const note=document.getElementById('aiNote');
+        if(note && d.ok) note.textContent='Workers AI 연결: '+(d.ai?'정상':'미연결')+' · 본캐 저장소: '+(d.r2?'R2 연결':'아직 로컬 저장');
+      }catch(e){}
+    }
+    checkAI();
+    setupPWAInstall();
+    ensureDeviceIdentity();
+    const hadLocal=loadState();
+    if(hadLocal){
+      go('home');
+      document.getElementById('nav').classList.add('show');
+      setTimeout(applyHome,0);
+    }
+    (async()=>{
+      const online=await checkServerSync();
+      if(online){
+        const loaded=await loadServerState();
+        if(loaded){
+          storageSet('myroomV13',JSON.stringify({
+            habit,roomStyle,petKind,petMode,charStyle,photoData,candidate,selectedAvatar,
+            P,saved,day,currentTime,smokeBase,alcoholCost,roomLevel,growthXP,todayHidden,foundHiddenIds
+          }));
+          if(!document.getElementById('home').classList.contains('active')){
+            go('home');
+            document.getElementById('nav').classList.add('show');
+          }
+          applyHome();
+        }
+      }
+    })()
+</script>
+</body>
+</html>
