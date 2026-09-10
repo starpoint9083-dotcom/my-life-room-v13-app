@@ -1,0 +1,144 @@
+name: Repair Workers AI timeout resilience once
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/repair-ai-timeout-resilience.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Harden the whole Workers AI timeout family
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          # 1) Server-side Workers AI generation timeout: 45s -> 75s.
+          p=Path('src/visual-engine.js'); s=p.read_text()
+          old='const VISUAL_TIMEOUT_MS=45000;'; new='const VISUAL_TIMEOUT_MS=75000;'
+          if old in s: s=s.replace(old,new,1)
+          elif new not in s: raise SystemExit('visual-engine timeout marker not found')
+          p.write_text(s)
+
+          # 2) Avatar browser request timeout: 48s -> 85s, preserving its existing retry loop.
+          p=Path('public/avatar-runtime-v15.js'); s=p.read_text()
+          old='setTimeout(()=>controller.abort(),48000)'; new='setTimeout(()=>controller.abort(),85000)'
+          if old in s: s=s.replace(old,new,1)
+          elif new not in s: raise SystemExit('avatar runtime timeout marker not found')
+          p.write_text(s)
+
+          # 3) Shared room/pet visual requests get the same 85s client ceiling plus two attempts.
+          p=Path('public/visual-runtime-v17.js'); s=p.read_text()
+          pattern=r'async function ensureAsset\(payload\)\{.*?\n\}\nasync function enhanceRoom\(\)\{'
+          replacement='''async function ensureAsset(payload){
+  const key=JSON.stringify(payload);if(memory.has("asset:"+key))return memory.get("asset:"+key);
+  const p=(async()=>{
+    let lastError=new Error("비주얼 생성 실패");
+    for(let attempt=1;attempt<=2;attempt++){
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),85000);
+      try{
+        const r=await fetch("/api/visual/ensure",{method:"POST",cache:"no-store",signal:controller.signal,headers:auth({"content-type":"application/json"}),body:JSON.stringify(payload)});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok||!d.ok||!d.url)throw new Error(d.error||`visual ${r.status}`);
+        return d.url;
+      }catch(e){
+        lastError=e?.name==="AbortError"?new Error("비주얼 생성 시간이 길어 자동으로 다시 시도합니다."):e;
+        if(attempt<2)await new Promise(resolve=>setTimeout(resolve,1200));
+      }finally{clearTimeout(timer)}
+    }
+    throw lastError;
+  })();
+  memory.set("asset:"+key,p);try{return await p}catch(e){memory.delete("asset:"+key);throw e}
+}
+async function enhanceRoom(){'''
+          if 'setTimeout(()=>controller.abort(),85000)' not in s:
+              s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+              if n!=1: raise SystemExit(f'visual runtime ensureAsset replacement count={n}')
+              s=s2
+          p.write_text(s)
+
+          # 4) Deployment verifier retries expensive Workers AI calls instead of failing on one transient timeout/capacity event.
+          p=Path('scripts/verify-deployment.mjs'); s=p.read_text()
+          avatar_pattern=r'async function verifyAvatarAI\(\)\{.*?\nasync function fetchVisualFile'
+          avatar_replacement='''async function verifyAvatarAI(){
+ let lastError=new Error("avatar AI verification failed");
+ for(let attempt=1;attempt<=3;attempt++){
+  const fd=new FormData();fd.append("image",new Blob([makeFacePng()],{type:"image/png"}),"ci-face.png");fd.append("style","나답게");fd.append("variant","0");
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
+  try{
+   const r=await fetch(base+"/api/avatar/generate-v17",{method:"POST",body:fd,cache:"no-store",signal:controller.signal}),d=await r.json().catch(()=>({}));
+   if(!r.ok||!d.ok||d.engine!=="v17"||typeof d.image!=="string"||!d.image.startsWith("data:image/jpeg;base64,"))throw new Error(`avatar v17 generation failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);
+   const bytes=Buffer.from(d.image.split(",")[1]||"","base64");if(bytes.length<10000)throw new Error(`avatar v17 image too small: ${bytes.length} bytes`);
+   console.log(`PASS Workers AI photoreal avatar v17 bytes=${bytes.length} attempt=${attempt}`);return;
+  }catch(e){lastError=e?.name==="AbortError"?new Error("avatar verifier request timed out"):e;console.log(`WAIT Workers AI avatar attempt ${attempt}/3: ${lastError.message}`);if(attempt<3)await sleep(5000*attempt)}finally{clearTimeout(timer)}
+ }
+ throw lastError;
+}
+async function fetchVisualFile'''
+          if 'WAIT Workers AI avatar attempt' not in s:
+              s2,n=re.subn(avatar_pattern,avatar_replacement,s,count=1,flags=re.S)
+              if n!=1: raise SystemExit(f'verifier avatar replacement count={n}')
+              s=s2
+
+          shared_pattern=r'async function verifySharedVisuals\(auth\)\{.*?\nasync function saveTestAvatar'
+          shared_replacement='''async function retryVisualJson(label,path,options){let lastError=new Error(`${label} failed`);for(let attempt=1;attempt<=3;attempt++){try{return await jsonCall(path,options)}catch(e){lastError=e;console.log(`WAIT ${label} attempt ${attempt}/3: ${e.message}`);if(attempt<3)await sleep(3000*attempt)}}throw lastError}
+async function verifySharedVisuals(auth){const room=await retryVisualJson("premium room generation","/api/visual/ensure",{method:"POST",headers:auth,body:{type:"room",roomStyle:"warm",level:1,time:"morning"}});if(!room.url||!room.key?.startsWith("visual-v17/shared/rooms/"))throw new Error(`room visual response invalid ${JSON.stringify(room).slice(0,300)}`);await fetchVisualFile(room.url,"premium room v17");const pet=await retryVisualJson("premium pet generation","/api/visual/ensure",{method:"POST",headers:auth,body:{type:"pet",petKind:"dog",petMode:"댕댕이형"}});if(!pet.url||!pet.key?.startsWith("visual-v17/shared/pets/"))throw new Error(`pet visual response invalid ${JSON.stringify(pet).slice(0,300)}`);await fetchVisualFile(pet.url,"premium pet v17");console.log(`PASS visual-v17 shared cache roomCached=${Boolean(room.cached)} petCached=${Boolean(pet.cached)}`)}
+async function saveTestAvatar'''
+          if 'retryVisualJson' not in s:
+              s2,n=re.subn(shared_pattern,shared_replacement,s,count=1,flags=re.S)
+              if n!=1: raise SystemExit(f'verifier shared visual replacement count={n}')
+              s=s2
+          p.write_text(s)
+
+          # 5) Keep the preflight contract aligned with the browser timeout policy.
+          p=Path('preflight.mjs'); s=p.read_text()
+          if '"48000"' in s: s=s.replace('"48000"','"85000"',1)
+          elif '"85000"' not in s: raise SystemExit('preflight avatar timeout marker not found')
+          p.write_text(s)
+          PY
+
+      - name: Validate the entire related family
+        run: |
+          set -euo pipefail
+          node --check src/visual-engine.js
+          node --check public/avatar-runtime-v15.js
+          node --check public/visual-runtime-v17.js
+          node --check scripts/verify-deployment.mjs
+          node --check preflight.mjs
+          npm audit --omit=dev --audit-level=high
+          for i in $(seq 1 10); do
+            echo "=== resilience validation $i/10 ==="
+            npm run check
+            rm -rf .wrangler-resilience-dry-run
+            npx wrangler deploy --dry-run --outdir .wrangler-resilience-dry-run
+          done
+
+      - name: Commit resilient AI handling
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then echo 'No changes required.'; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/visual-engine.js public/avatar-runtime-v15.js public/visual-runtime-v17.js scripts/verify-deployment.mjs preflight.mjs
+          git commit -m 'Harden Workers AI timeout and retry handling'
+          git push
