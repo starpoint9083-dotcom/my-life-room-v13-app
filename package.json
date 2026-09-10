@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "check": "node preflight.mjs",
+    "check": "node preflight.mjs && node scripts/visual-hotfix-selfcheck.mjs",
+    "check:visual": "node scripts/visual-hotfix-selfcheck.mjs",
     "deploy:prepare": "node scripts/prepare-cloudflare.mjs",
     "deploy:verify": "node scripts/verify-deployment.mjs"
   },

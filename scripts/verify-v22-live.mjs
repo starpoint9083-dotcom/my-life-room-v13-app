@@ -7,8 +7,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const specs=[
  ["core-v21","/core-runtime-v21.js",b=>b.includes("p2CoreV21")&&b.includes("riskState")&&b.includes("maybeNotify")&&b.includes("/api/life/summary")],
  ["continuity-v22","/continuity-runtime-v22.js",b=>b.includes("p2ContinuityV22")&&b.includes("seedHidden")&&b.includes("installRewardGuards")&&b.includes("syncOverallResult")&&b.includes("continuity-v22")],
+ ["visual-safe-v22","/visual-runtime-v17.js",b=>b.includes("borderStats")&&b.includes("alphaAudit")&&b.includes("unsafe cutout")&&b.includes("visual17GetMasterCutout")&&b.includes("visual17Cutout=cutout")&&!b.includes("dr*dr+dg*dg+db*db<6400")],
+ ["pose-safe-v22","/pose-runtime-v20.js",b=>b.includes("visual17RestoreMaster")&&b.includes("visual17GetMasterCutout")&&b.includes("visual integrity engine not ready")&&!b.includes("img.src=selectedAvatar")&&!b.includes("dr*dr+dg*dg+db*db<7200")],
  ["reset-v22-loader","/reset-runtime-v16.js",b=>b.includes("loadP2Continuity")&&b.includes("continuity-runtime-v22.js?v=22")&&b.includes("data-p2-continuity")],
- ["service-worker-v22","/sw.js",b=>b.includes("my-life-room-v22-shell")&&b.includes("/core-runtime-v21.js")&&b.includes("/continuity-runtime-v22.js")]
+ ["service-worker-v22","/sw.js",b=>b.includes("my-life-room-v22-shell")&&b.includes('const BUILD="visualfix1"')&&b.includes("/core-runtime-v21.js")&&b.includes("/continuity-runtime-v22.js")]
 ];
 async function check(name,path,predicate){
  try{
@@ -21,7 +23,7 @@ let last=[];
 for(let attempt=1;attempt<=12;attempt++){
  console.log(`V22 live verification attempt ${attempt}/12: ${base}`);last=[];
  for(const [name,path,predicate] of specs){const r=await check(name,path,predicate);last.push(r);console.log(`${r.ok?"PASS":"WAIT"} ${name} ${r.status||""} ${r.error||""}`)}
- if(last.every(x=>x.ok)){console.log("DEPLOYMENT VERIFIED P2 V22 CONTINUITY");process.exit(0)}
+ if(last.every(x=>x.ok)){console.log("DEPLOYMENT VERIFIED P2 V22 CONTINUITY + VISUAL SAFETY");process.exit(0)}
  if(attempt<12)await sleep(5000);
 }
 console.error("P2 V22 live verification failed after retries.");for(const r of last)console.error(`${r.name}: status=${r.status} error=${r.error||""} preview=${r.preview||""}`);process.exit(1);
