@@ -15,13 +15,13 @@ const prepare=fs.readFileSync("scripts/prepare-cloudflare.mjs","utf8");
 const verify=fs.readFileSync("scripts/verify-deployment.mjs","utf8");
 
 const errors=[];
-for(const fn of ["finishSetup","applyHome","setTime","setDay","openMorning","openAlcohol","openSmoking","generateCandidates","saveState","checkServerSync","pushServerState","loadServerState","applySceneAssets","fetchRiskProfile","recordHabitSignal","setupPWAInstall"]){
+for(const fn of ["finishSetup","applyHome","setTime","setDay","openMorning","openAlcohol","openSmoking","generateCandidates","saveState","checkServerSync","pushServerState","loadServerState","applySceneAssets","fetchRiskProfile","recordHabitSignal","setupPWAInstall","resetAll"]){
   if(!html.includes(`function ${fn}(`)&&!html.includes(`async function ${fn}(`))errors.push(`missing function ${fn}`);
 }
 for(const route of ["/api/health","/api/avatar/generate","/api/avatar/save","/api/state","/api/event","/api/signal","/api/risk-profile"]){
   if(!worker.includes(route))errors.push(`missing route ${route}`);
 }
-for(const route of ["/api/life/summary","/api/life/profile","/api/life/daily","/api/life/smoking","/api/life/condition","/api/life/message"]){
+for(const route of ["/api/life/summary","/api/life/profile","/api/life/daily","/api/life/smoking","/api/life/condition","/api/life/message","/api/life/reset"]){
   if(!life.includes(route))errors.push(`missing life route ${route}`);
 }
 for(const t of ["app_state","app_events","avatars"]){if(!sql1.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`)}
@@ -29,7 +29,8 @@ for(const t of ["device_auth","habit_signals"]){if(!sql2.includes(`CREATE TABLE 
 for(const t of ["life_profiles","life_daily","clear_messages"]){if(!sql3.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`)}
 for(const key of ["const ACTIONS = [","const HIDDEN_CHANGES=[","const ASSET_MANIFEST ="]){if(!html.includes(key))errors.push(`missing engine ${key}`)}
 for(const key of ["실사용 엔진","맑은 나의 메시지","syncDaily","syncSmoking","syncCondition","riskTick"]){if(!runtime.includes(key))errors.push(`missing runtime feature ${key}`)}
-for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","38000","실패한 후보만 이어서"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar resilience ${key}`)}
+for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","38000","실패한 후보만 이어서","fullReset","/api/life/reset","startsWith('myroom')","window.resetAll=fullReset"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar/reset resilience ${key}`)}
+for(const key of ["DELETE FROM clear_messages","DELETE FROM life_daily","DELETE FROM life_profiles","DELETE FROM habit_signals","DELETE FROM app_events","DELETE FROM avatars","DELETE FROM app_state","DELETE FROM device_auth","AVATAR_ASSETS.delete"]){if(!life.includes(key))errors.push(`incomplete server reset ${key}`)}
 if(!worker.includes("crypto.subtle.digest"))errors.push("device token hashing missing");
 if(!worker.includes("env.DB"))errors.push("worker D1 binding usage missing");
 if(!worker.includes("env.AVATAR_ASSETS"))errors.push("worker R2 binding usage missing");
@@ -52,8 +53,8 @@ if(wrangler.assets?.directory!=="./public")errors.push("static assets directory 
 for(const needle of ["d1\",\"create", "r2\",\"bucket\",\"create", "d1_databases", "r2_buckets", "migrations\",\"apply", "wrangler.production.jsonc"]){
   if(!prepare.includes(needle))errors.push(`prepare script missing ${needle}`);
 }
-for(const needle of ["/api/health", "d?.ai===true", "d?.d1===true", "d?.r2===true", "DEPLOYMENT VERIFIED"]){
+for(const needle of ["/api/health", "/api/life/reset", "stateAfter.state!==null", "d?.ai===true", "d?.d1===true", "d?.r2===true", "DEPLOYMENT VERIFIED"]){
   if(!verify.includes(needle))errors.push(`verify script missing ${needle}`);
 }
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
-console.log("V13 live-room + avatar-v15 preflight passed");
+console.log("V13 live-room + avatar-v15 + full-reset preflight passed");
