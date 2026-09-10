@@ -28,9 +28,11 @@ jobs:
           set -euo pipefail
           node --check src/index.js
           node --check src/life-engine.js
+          node --check src/visual-engine.js
           node --check public/runtime-v14.js
           node --check public/avatar-runtime-v15.js
           node --check public/reset-runtime-v16.js
+          node --check public/visual-runtime-v17.js
           node --check preflight.mjs
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
