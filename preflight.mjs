@@ -36,10 +36,10 @@ for(const t of ["life_profiles","life_daily","clear_messages"]){if(!sql3.include
 for(const key of ["const ACTIONS = [","const HIDDEN_CHANGES=[","const ASSET_MANIFEST ="]){if(!html.includes(key))errors.push(`missing engine ${key}`)}
 for(const key of ["실사용 엔진","맑은 나의 메시지","syncDaily","syncSmoking","syncCondition","riskTick"]){if(!runtime.includes(key))errors.push(`missing runtime feature ${key}`)}
 for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","48000","/api/avatar/generate-v17","loadVisual17"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar v17 bridge ${key}`)}
-for(const key of ["fullReset","/api/life/reset","localStorage.clear()","sessionStorage.clear()","caches.keys()","window.resetAll=fullReset"]){if(!resetRuntime.includes(key))errors.push(`missing full reset client feature ${key}`)}
+for(const key of ["setupReset","fullReset","/api/life/reset","JSON.stringify({scope:\"setup\"})","localStorage.removeItem(\"myroomV13\")","localStorage.clear()","sessionStorage.clear()","caches.keys()","window.resetAll=setupReset"]){if(!resetRuntime.includes(key))errors.push(`missing safe reset client feature ${key}`)}
 for(const key of ["cutout","avgCorner","ensureAsset","enhanceAvatar","enhanceRoom","enhancePet","applyVisual","visual17"]){if(!visualRuntime.includes(key))errors.push(`missing premium visual runtime ${key}`)}
 for(const key of ["roomPrompt","petPrompt","avatarPrompt","VISUAL_MODEL","visual-v17/shared/","AVATAR_ASSETS.put","Photorealistic"]){if(!visual.includes(key))errors.push(`missing premium visual server ${key}`)}
-for(const key of ["DELETE FROM clear_messages","DELETE FROM life_daily","DELETE FROM life_profiles","DELETE FROM habit_signals","DELETE FROM app_events","DELETE FROM avatars","DELETE FROM app_state","DELETE FROM device_auth","AVATAR_ASSETS.delete"]){if(!life.includes(key))errors.push(`incomplete server reset ${key}`)}
+for(const key of ["resetSetup","resetFull","DELETE FROM clear_messages","DELETE FROM life_daily","DELETE FROM life_profiles","DELETE FROM habit_signals","DELETE FROM app_events","DELETE FROM avatars","DELETE FROM app_state","DELETE FROM device_auth","AVATAR_ASSETS.delete"]){if(!life.includes(key))errors.push(`incomplete server reset ${key}`)}
 if(!life.includes("handleVisualRoute"))errors.push("visual engine is not bridged through life engine");
 if(!worker.includes("crypto.subtle.digest"))errors.push("device token hashing missing");
 if(!worker.includes("env.DB"))errors.push("worker D1 binding usage missing");
@@ -64,8 +64,8 @@ if(wrangler.assets?.directory!=="./public")errors.push("static assets directory 
 for(const needle of ["d1\",\"create", "r2\",\"bucket\",\"create", "d1_databases", "r2_buckets", "migrations\",\"apply", "wrangler.production.jsonc"]){
   if(!prepare.includes(needle))errors.push(`prepare script missing ${needle}`);
 }
-for(const needle of ["/api/health","/api/life/reset","/api/avatar/save","/api/avatar/generate-v17","/api/visual/ensure","r2Deleted","alternateToken","stateAfter.state!==null","d?.ai===true","d?.d1===true","d?.r2===true","DEPLOYMENT VERIFIED"]){
+for(const needle of ["/api/health","/api/life/reset","scope:\"setup\"","scope:\"full\"","/api/avatar/save","/api/avatar/generate-v17","/api/visual/ensure","r2Deleted","stateAfterSetup.state!==null","profile===null","d?.ai===true","d?.d1===true","d?.r2===true","DEPLOYMENT VERIFIED"]){
   if(!verify.includes(needle))errors.push(`verify script missing ${needle}`);
 }
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
-console.log("V13 live-room + avatar-v15 + reset-v16 + premium-visual-v17 preflight passed");
+console.log("V13 live-room + avatar-v15 + safe-reset-v16 + premium-visual-v17 preflight passed");
