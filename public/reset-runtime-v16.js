@@ -1,6 +1,6 @@
 (()=>{
 "use strict";
-const RESET_VERSION="v16.2";
+const RESET_VERSION="v16.3";
 let resetting=false;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 function msg(text){try{if(typeof toast==="function")toast(text)}catch{}try{const e=document.getElementById("event");if(e)e.textContent=text}catch{}}
@@ -116,7 +116,16 @@ function captureResetClick(e){
   if(!raw.includes("resetAll")&&label!=="초기화")return;
   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();setupReset();
 }
-function loadP2Core(){if(document.querySelector('script[data-p2-core="v21"]'))return;const s=document.createElement("script");s.src="/core-runtime-v21.js?v=21";s.dataset.p2Core="v21";s.async=false;document.body.appendChild(s)}
+function loadP2Continuity(){
+  if(window.p2ContinuityV22||document.querySelector('script[data-p2-continuity="v22"]'))return;
+  const s=document.createElement("script");s.src="/continuity-runtime-v22.js?v=22";s.dataset.p2Continuity="v22";s.async=false;document.body.appendChild(s);
+}
+function loadP2Core(){
+  const existing=document.querySelector('script[data-p2-core="v21"]');
+  if(window.p2CoreV21){loadP2Continuity();return}
+  if(existing){existing.addEventListener("load",loadP2Continuity,{once:true});return}
+  const s=document.createElement("script");s.src="/core-runtime-v21.js?v=21";s.dataset.p2Core="v21";s.async=false;s.addEventListener("load",loadP2Continuity,{once:true});document.body.appendChild(s)
+}
 function install(){
   window.resetAll=setupReset;window.setupReset=setupReset;window.fullReset=fullReset;window.__resetVersion=RESET_VERSION;
   const oldSave=window.saveState;if(typeof oldSave==="function"&&!oldSave.__resetSafe){const fn=function(){if(window.__resetLock)return;return oldSave.apply(this,arguments)};fn.__resetSafe=true;window.saveState=fn}

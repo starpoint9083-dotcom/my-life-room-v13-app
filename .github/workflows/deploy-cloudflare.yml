@@ -36,6 +36,7 @@ jobs:
           node --check public/room-runtime-v19.js
           node --check public/pose-runtime-v20.js
           node --check public/core-runtime-v21.js
+          node --check public/continuity-runtime-v22.js
           node --check preflight.mjs
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
