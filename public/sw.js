@@ -1,5 +1,5 @@
-const CACHE="my-life-room-v12-shell";
-const SHELL=["/","/index.html","/manifest.webmanifest","/assets/asset_manifest.json"];
+const CACHE="my-life-room-v14-shell";
+const SHELL=["/","/index.html","/manifest.webmanifest","/runtime-v14.js","/assets/asset_manifest.json"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).catch(()=>{}));
   self.skipWaiting();
