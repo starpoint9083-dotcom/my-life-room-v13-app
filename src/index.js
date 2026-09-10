@@ -1,3 +1,5 @@
+import {handleLifeRoute} from "./life-engine.js";
+
 const MODEL="@cf/black-forest-labs/flux-2-klein-4b";
 
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
@@ -123,11 +125,22 @@ async function riskProfile(request,env){
   const total=(rows.results||[]).reduce((a,r)=>a+Number(r.n||0),0);
   return json({ok:true,profile:{alcoholHours:top(alcohol),smokingHours:top(smoking),baseScore:Math.min(35,10+total),sampleCount:total}});
 }
+async function assetResponseWithRuntime(request,env){
+  const response=await env.ASSETS.fetch(request);
+  if(request.method!=="GET"||!response.ok)return response;
+  const type=response.headers.get("content-type")||"";
+  if(!type.includes("text/html"))return response;
+  const html=await response.text();
+  if(html.includes("/runtime-v14.js"))return new Response(html,response);
+  const injected=html.includes("</body>")?html.replace("</body>",'<script src="/runtime-v14.js" defer></script></body>'):html+'<script src="/runtime-v14.js" defer></script>';
+  const headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");
+  return new Response(injected,{status:response.status,statusText:response.statusText,headers});
+}
 
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
-    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL});
+    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true});
     if(url.pathname==="/api/avatar/generate"&&request.method==="POST")return generateAvatar(request,env);
     if(url.pathname==="/api/avatar/save"&&request.method==="POST")return saveAvatar(request,env);
     if(url.pathname==="/api/state"&&request.method==="GET")return getState(request,env);
@@ -135,7 +148,8 @@ export default {
     if(url.pathname==="/api/event"&&request.method==="POST")return addEvent(request,env);
     if(url.pathname==="/api/signal"&&request.method==="POST")return addSignal(request,env);
     if(url.pathname==="/api/risk-profile"&&request.method==="GET")return riskProfile(request,env);
+    const life=await handleLifeRoute(request,env,ensureAuth,json);if(life)return life;
     if(url.pathname.startsWith("/api/"))return json({ok:false,error:"Not found"},404);
-    return env.ASSETS.fetch(request);
+    return assetResponseWithRuntime(request,env);
   }
 };
