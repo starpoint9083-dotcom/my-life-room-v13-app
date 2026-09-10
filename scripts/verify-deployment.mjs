@@ -10,11 +10,12 @@ base=base.replace(/\/$/,"");
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const specs=[
-  ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")],
-  ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true],
+  ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")],
+  ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"],
   ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
+  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("AbortController")&&b.includes("실패한 후보만 이어서")],
   ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
-  ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room")]
+  ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v15-shell")&&b.includes("/avatar-runtime-v15.js")]
 ];
 
 async function runCheck(name,path,predicate){
