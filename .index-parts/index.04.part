@@ -1,0 +1,219 @@
+andomValues(bytes);token=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')}
+    catch(e){token=Math.random().toString(36).slice(2)+Date.now().toString(36)+Math.random().toString(36).slice(2)}
+    storageSet('myroomDeviceToken',token);
+  }
+  deviceId=id;deviceToken=token;
+  return {deviceId,deviceToken};
+}
+function authHeaders(extra={}){
+  return {...extra,'x-device-id':deviceId||'','x-device-token':deviceToken||''};
+}
+function cloudUI(mode,text,detail){
+  const box=document.getElementById('cloudState');
+  const tx=document.getElementById('cloudText');
+  const info=document.getElementById('syncInfo');
+  if(box){box.classList.remove('online','syncing','offline');box.classList.add(mode)}
+  if(tx)tx.textContent=text;
+  if(info&&detail)info.textContent=detail;
+}
+function serverState(){
+  return {
+    habit,roomStyle,petKind,petMode,charStyle,candidate,
+    P,saved,day,currentTime,smokeBase,alcoholCost,
+    roomLevel,growthXP,todayHidden,foundHiddenIds,
+    selectedAvatarKey:storageGet('myroomAvatarKey')||null
+  };
+}
+async function checkServerSync(){
+  ensureDeviceIdentity();
+  if(location.protocol==='file:'){
+    serverSyncEnabled=false;
+    cloudUI('offline','기기 저장','로컬 파일에서는 기기 저장만 사용합니다.');
+    return false;
+  }
+  try{
+    const r=await fetch('/api/health',{cache:'no-store'});
+    const d=await r.json();
+    serverSyncEnabled=Boolean(d.ok&&d.d1);
+    if(serverSyncEnabled){
+      cloudUI('online','클라우드 연결','D1 서버 저장이 연결되어 있습니다.');
+      setTimeout(fetchRiskProfile,100);
+      return true;
+    }
+  }catch(e){}
+  serverSyncEnabled=false;
+  cloudUI('offline','기기 저장','D1이 연결되지 않아 기기 저장으로 계속 작동합니다.');
+  return false;
+}
+function mergeServerState(s){
+  if(!s||typeof s!=='object')return;
+  if(s.habit)habit=s.habit;
+  if(s.roomStyle!==undefined)roomStyle=s.roomStyle;
+  if(s.petKind)petKind=s.petKind;
+  if(s.petMode)petMode=s.petMode;
+  if(s.charStyle)charStyle=s.charStyle;
+  if(Number.isFinite(s.candidate))candidate=s.candidate;
+  if(Number.isFinite(s.P))P=s.P;
+  if(Number.isFinite(s.saved))saved=s.saved;
+  if(s.day)day=s.day;
+  if(s.currentTime)currentTime=s.currentTime;
+  if(Number.isFinite(s.smokeBase))smokeBase=s.smokeBase;
+  if(Number.isFinite(s.alcoholCost))alcoholCost=s.alcoholCost;
+  if(Number.isFinite(s.roomLevel))roomLevel=s.roomLevel;
+  if(Number.isFinite(s.growthXP))growthXP=s.growthXP;
+  if(Array.isArray(s.todayHidden))todayHidden=s.todayHidden;
+  if(Array.isArray(s.foundHiddenIds))foundHiddenIds=s.foundHiddenIds;
+  if(s.selectedAvatarKey)storageSet('myroomAvatarKey',s.selectedAvatarKey);
+}
+async function loadServerState(){
+  if(!serverSyncEnabled)return false;
+  try{
+    const r=await fetch('/api/state',{cache:'no-store',headers:authHeaders()});
+    const d=await r.json();
+    if(r.ok&&d.ok&&d.state){
+      mergeServerState(d.state);
+      cloudUI('online','동기화됨','서버에서 최근 상태를 불러왔습니다.');
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+async function pushServerState(reason='auto'){
+  if(!serverSyncEnabled)return false;
+  cloudUI('syncing','저장 중','변경 내용을 서버에 저장하고 있습니다.');
+  try{
+    const r=await fetch('/api/state',{
+      method:'POST',
+      headers:authHeaders({'content-type':'application/json'}),
+      body:JSON.stringify({state:serverState(),reason})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){
+      lastServerSync=Date.now();
+      cloudUI('online','동기화됨','기기와 서버에 모두 저장되었습니다.');
+      return true;
+    }
+  }catch(e){}
+  cloudUI('offline','기기 저장','서버 저장 실패. 기기 저장은 유지됩니다.');
+  return false;
+}
+function scheduleServerSync(reason='auto'){
+  if(!serverSyncEnabled)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>pushServerState(reason),450);
+}
+async function logEvent(type,payload={}){
+  if(!serverSyncEnabled)return;
+  try{
+    await fetch('/api/event',{
+      method:'POST',
+      headers:authHeaders({'content-type':'application/json'}),
+      body:JSON.stringify({type,payload})
+    });
+  }catch(e){}
+}
+
+
+function riskLabel(score){
+  if(score>=70)return '높음';
+  if(score>=40)return '보통';
+  return '낮음';
+}
+function renderRisk(){
+  const text=document.getElementById('riskText');
+  const scoreEl=document.getElementById('riskScore');
+  const fill=document.getElementById('riskFill');
+  if(!text||!scoreEl||!fill)return;
+  if(!riskProfile){
+    text.textContent='사용 패턴을 조금 더 배우고 있어요';
+    scoreEl.textContent='학습 중';
+    fill.style.width='18%';
+    return;
+  }
+  const now=new Date();
+  const h=now.getHours();
+  const candidates=[...(riskProfile.alcoholHours||[]),...(riskProfile.smokingHours||[])];
+  let dist=99;
+  for(const hr of candidates){
+    const d=Math.min(Math.abs(hr-h),24-Math.abs(hr-h));
+    if(d<dist)dist=d;
+  }
+  let score=riskProfile.baseScore||20;
+  if(dist<=1)score+=45;
+  else if(dist<=2)score+=25;
+  if(currentTime==='evening')score+=10;
+  score=Math.max(5,Math.min(95,score));
+  text.textContent=candidates.length?`예상 위험시간: ${candidates.map(x=>String(x).padStart(2,'0')+':00').join(', ')}`:'패턴을 더 기록하면 자동으로 예상합니다';
+  scoreEl.textContent=riskLabel(score);
+  fill.style.width=score+'%';
+}
+async function fetchRiskProfile(){
+  if(!serverSyncEnabled){renderRisk();return}
+  try{
+    const r=await fetch('/api/risk-profile',{headers:authHeaders(),cache:'no-store'});
+    const d=await r.json();
+    if(r.ok&&d.ok){riskProfile=d.profile;renderRisk()}
+  }catch(e){renderRisk()}
+}
+async function recordHabitSignal(kind,amount=1,meta={}){
+  if(!serverSyncEnabled)return;
+  try{
+    await fetch('/api/signal',{
+      method:'POST',
+      headers:authHeaders({'content-type':'application/json'}),
+      body:JSON.stringify({kind,amount,meta,local_hour:new Date().getHours(),weekday:new Date().getDay()})
+    });
+    setTimeout(fetchRiskProfile,250);
+  }catch(e){}
+}
+async function requestNotificationPermission(){
+  if(!('Notification' in window))return false;
+  if(Notification.permission==='granted')return true;
+  if(Notification.permission==='denied')return false;
+  const p=await Notification.requestPermission();
+  return p==='granted';
+}
+function setupPWAInstall(){
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();deferredInstallPrompt=e;
+    const btn=document.getElementById('installBtn');
+    if(btn)btn.classList.add('show');
+  });
+  const btn=document.getElementById('installBtn');
+  if(btn)btn.onclick=async()=>{
+    if(!deferredInstallPrompt){toast('Chrome 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 선택할 수 있어요.');return}
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt=null;btn.classList.remove('show');
+  };
+  if('serviceWorker' in navigator && location.protocol!=='file:'){
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  }
+}
+
+function storageSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function storageGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function storageDel(k){try{localStorage.removeItem(k)}catch(e){}}
+
+document.querySelectorAll('.habit').forEach(el=>el.onclick=()=>{document.querySelectorAll('.habit').forEach(x=>x.classList.remove('active'));el.classList.add('active');habit=el.dataset.v});
+document.querySelectorAll('.charStyle').forEach(el=>el.onclick=()=>{document.querySelectorAll('.charStyle').forEach(x=>x.classList.remove('active'));el.classList.add('active');charStyle=el.textContent});
+document.querySelectorAll('.roomOpt').forEach(el=>el.onclick=()=>{document.querySelectorAll('.roomOpt').forEach(x=>x.classList.remove('active'));el.classList.add('active');roomStyle=el.dataset.v});
+document.querySelectorAll('.petKind').forEach(el=>el.onclick=()=>{document.querySelectorAll('.petKind').forEach(x=>x.classList.remove('active'));el.classList.add('active');petKind=el.dataset.v;renderPetModes()});
+document.getElementById('photoInput').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{photoData=ev.target.result;document.getElementById('photoPreview').src=photoData;document.getElementById('photoPreview').style.display='block';document.getElementById('photoHint').style.display='none';generatedCandidates=[];selectedAvatar=null;document.getElementById('candidates').classList.remove('show');document.getElementById('characterNext').style.display='none'};r.readAsDataURL(f)});
+
+function renderPetModes(){
+ const a=petKind==='cat'?['집사취급형','개냥이형']:['듬직이형','댕댕이형']; if(!a.includes(petMode))petMode=a[0];
+ const box=document.getElementById('petModes');box.innerHTML='';a.forEach(x=>{const s=document.createElement('span');s.className='pill'+(x===petMode?' active':'');s.textContent=x;s.onclick=()=>{petMode=x;renderPetModes()};box.appendChild(s)})
+}
+renderPetModes();
+
+
+async function resizeSelfieForAI(dataUrl){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=480;
+      const scale=Math.min(1,max/Math.max(img.width,img.height));
+      const w=Math.max(64,Math.round(img.width*scale));
+      const h=Math.max(64,Math.round(img.height*scale));
+      const c=document.createElement('c
