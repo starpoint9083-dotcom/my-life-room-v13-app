@@ -1,0 +1,36 @@
+(()=>{
+"use strict";
+const byId=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let summary=null,risk=null,timer=null,lastNotify="";
+function auth(extra={}){try{return typeof authHeaders==="function"?authHeaders(extra):extra}catch{return extra}}
+function habitNow(){try{return habit||"금주"}catch{return "금주"}}
+function hourNow(){return new Date().getHours()}
+function todayKey(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
+function addStyle(){if(byId("p2Core21Style"))return;const s=document.createElement("style");s.id="p2Core21Style";s.textContent=`
+.p2now{background:#fff;border:1px solid var(--line);border-radius:17px;padding:11px;margin:8px 0;box-shadow:var(--shadow)}
+.p2nowTop{display:flex;align-items:center;justify-content:space-between;gap:8px}.p2nowTitle{font-size:12px;font-weight:900}.p2nowState{font-size:9px;color:var(--muted)}
+.p2nowText{font-size:11px;line-height:1.45;color:#5f5953;margin-top:6px}.p2nowBtns{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}.p2nowBtns button{border:1px solid var(--line);background:#faf8f5;border-radius:11px;padding:9px 5px;font-size:10px}.p2nowBtns button.primary{background:#242424;color:#fff;border-color:#242424}.p2nowBtns.three{grid-template-columns:repeat(3,1fr)}
+`;document.head.appendChild(s)}
+function mount(){addStyle();if(byId("p2Now"))return byId("p2Now");const riskStrip=document.querySelector(".riskStrip"),home=byId("home");if(!home)return null;const box=document.createElement("div");box.id="p2Now";box.className="p2now";box.innerHTML='<div class="p2nowTop"><div class="p2nowTitle">지금의 방</div><div class="p2nowState" id="p2NowState">실제 상태 확인 중</div></div><div class="p2nowText" id="p2NowText">현재 시간과 오늘 기록을 확인하고 있어요.</div><div class="p2nowBtns" id="p2NowBtns"></div>';if(riskStrip)riskStrip.insertAdjacentElement("afterend",box);else home.prepend(box);return box}
+async function getJSON(path){const r=await fetch(path,{headers:auth(),cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||String(r.status));return d}
+function isRecorded(){const t=summary?.today,h=habitNow();if(!t)return false;if(h==="금주")return Boolean(t.alcohol_result);if(h==="금연")return t.smoking_count!==null&&t.smoking_count!==undefined;return Boolean(t.alcohol_result)&&(t.smoking_count!==null&&t.smoking_count!==undefined)}
+function riskState(){const h=hourNow(),alcohol=(risk?.alcoholHours||[]),smoking=(risk?.smokingHours||[]);const due=a=>a.some(x=>Number(x)===h||Number(x)===(h+1)%24);return {alcohol:due(alcohol),smoking:due(smoking)}}
+function actionButton(label,fn,primary=false){const b=document.createElement("button");b.type="button";b.textContent=label;if(primary)b.classList.add("primary");b.onclick=fn;return b}
+function invoke(name,...args){try{const f=window[name];if(typeof f==="function")return f(...args)}catch{}try{const f=eval(`typeof ${name}==='function'?${name}:null`);if(f)return f(...args)}catch{} }
+function messageButton(){return actionButton("맑은 메시지",()=>{const b=byId("clearMessageBtn");if(b)b.click();else invoke("openMorning")})}
+async function enableNotify(){if(!("Notification" in window)){invoke("toast","이 브라우저는 알림을 지원하지 않아요.");return}const p=await Notification.requestPermission();invoke("toast",p==="granted"?"위험시간 알림을 켰습니다.":"알림 권한이 허용되지 않았습니다.");render()}
+function maybeNotify(kind,text){if(!("Notification" in window)||Notification.permission!=="granted")return;const key=`${todayKey()}-${hourNow()}-${kind}`;if(lastNotify===key||localStorage.getItem("p2NotifyLast")===key)return;lastNotify=key;localStorage.setItem("p2NotifyLast",key);try{new Notification("나의 방",{body:text,tag:key})}catch{}}
+function render(){mount();const state=byId("p2NowState"),text=byId("p2NowText"),btns=byId("p2NowBtns");if(!state||!text||!btns)return;btns.innerHTML="";btns.className="p2nowBtns";const h=hourNow(),rs=riskState(),habitType=habitNow();
+ if(h>=6&&h<10){state.textContent="아침";text.textContent="좋은 아침이에요. 기록부터 재촉하지 않고 어제의 선택이 만든 변화를 먼저 보여드릴게요.";btns.append(actionButton("☀️ 아침 루틴",()=>invoke("openMorning"),true),messageButton());return}
+ if((habitType==="금주"||habitType==="둘 다")&&rs.alcohol){state.textContent="금주 위험시간";text.textContent="평소 흔들리기 쉬운 시간에 가까워졌어요. 방이 먼저 알아챘습니다.";btns.append(actionButton("🍷 지금 방어하기",()=>invoke("openAlcohol"),true),messageButton());if(Notification.permission!=="granted")btns.append(actionButton("알림 켜기",enableNotify));maybeNotify("alcohol","평소 술 위험시간에 가까워졌어요. 방에서 먼저 한 번 막아볼까요?");return}
+ if((habitType==="금연"||habitType==="둘 다")&&rs.smoking){state.textContent="금연 위험시간";text.textContent="담배 생각이 반복되던 시간에 가까워졌어요. 길게 참지 말고 짧게 넘겨봅니다.";btns.append(actionButton("🚭 3분 방어",()=>invoke("openSmoking"),true),messageButton());if(Notification.permission!=="granted")btns.append(actionButton("알림 켜기",enableNotify));maybeNotify("smoking","담배 위험시간에 가까워졌어요. 3분만 먼저 넘겨보세요.");return}
+ if(h>=18&&!isRecorded()){state.textContent="오늘 마무리";text.textContent="오늘 결과가 아직 기록되지 않았어요. 한 번만 선택하면 방의 성장과 내일의 변화가 실제 기록에 맞춰 이어집니다.";btns.classList.add("three");btns.append(actionButton("✨ 완전 성공",()=>invoke("setDay","success"),true),actionButton("🌱 감량 성공",()=>invoke("setDay","reduce")),actionButton("🌧 사용한 날",()=>invoke("setDay","slip")));return}
+ if(isRecorded()){state.textContent="오늘 기록 완료";const t=summary.today||{};const parts=[];if(t.alcohol_result)parts.push(t.alcohol_result==="success"?"금주 성공":t.alcohol_result==="reduce"?"술 감량":"술 사용 기록");if(t.smoking_count!==null&&t.smoking_count!==undefined)parts.push(`담배 ${t.smoking_count}개비`);text.textContent=(parts.length?parts.join(" · ")+". ":"")+"오늘 기록을 바탕으로 방이 계속 움직이고 성장합니다.";btns.append(messageButton(),actionButton("방 둘러보기",()=>invoke("avatarTap")));return}
+ state.textContent="생활 중";text.textContent="지금은 강하게 개입할 시간이 아니에요. 방과 펫은 조용히 생활하고, 실제 기록은 계속 이어집니다.";btns.append(actionButton("🐾 펫 보기",()=>invoke("petTap")),messageButton())
+}
+async function refresh(){mount();try{if(typeof ensureDeviceIdentity==="function")ensureDeviceIdentity();const [s,r]=await Promise.all([getJSON("/api/life/summary"),getJSON("/api/risk-profile")]);summary=s.summary||null;risk=r.profile||null;render()}catch(e){const state=byId("p2NowState"),text=byId("p2NowText");if(state)state.textContent="기기 모드";if(text)text.textContent="서버 연결을 다시 확인하고 있어요. 방 자체는 계속 사용할 수 있습니다."}}
+function wrap(name){const old=window[name];if(typeof old!=="function"||old.__p2core21)return;const fn=function(){const r=old.apply(this,arguments);Promise.resolve(r).finally(()=>setTimeout(refresh,550));return r};fn.__p2core21=true;window[name]=fn}
+async function install(){mount();await sleep(500);["setDay","smokeResult","saveCond","alcoholNo","planDone","finishTimer"].forEach(wrap);await refresh();clearInterval(timer);timer=setInterval(refresh,60000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh()});window.p2CoreV21={refresh,state:()=>({summary,risk})}}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
+})();
