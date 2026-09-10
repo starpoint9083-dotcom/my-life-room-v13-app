@@ -41,6 +41,7 @@ jobs:
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
           node --check scripts/verify-v22-live.mjs
+          node --check scripts/visual-hotfix-selfcheck.mjs
           node --check scripts/check-live.mjs
           node --check scripts/ai-autopilot.mjs
           npm audit --omit=dev --audit-level=high
