@@ -3,18 +3,12 @@
   "name": "my-life-room-v13-live-0910",
   "main": "src/index.js",
   "compatibility_date": "2026-09-10",
-  "ai": {
-    "binding": "AI"
-  },
+  "ai": { "binding": "AI" },
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/api/*"
-    ]
+    "run_worker_first": ["/*"]
   },
-  "observability": {
-    "enabled": true
-  }
+  "observability": { "enabled": true }
 }
