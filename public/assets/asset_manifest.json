@@ -1,0 +1,25 @@
+{
+  "version": "10",
+  "room_levels": {
+    "1": "starter bright studio",
+    "2": "growth room",
+    "3": "better home",
+    "4": "premium home"
+  },
+  "time_states": [
+    "morning",
+    "leave",
+    "day",
+    "return",
+    "evening",
+    "night"
+  ],
+  "room_asset_pattern": "assets/rooms/lv{level}_{time}.webp",
+  "avatar_asset_pattern": "assets/avatar/{state}.webp",
+  "pet_assets": {
+    "집사취급형": "assets/pets/cat_boss.webp",
+    "개냥이형": "assets/pets/cat_affection.webp",
+    "듬직이형": "assets/pets/dog_steady.webp",
+    "댕댕이형": "assets/pets/dog_playful.webp"
+  }
+}
