@@ -29,7 +29,7 @@ function revealCandidates(){const box=$("candidates");if(box)box.classList.add('
 async function fetchOneAvatar(blob,variant){
   let lastError=new Error('AI 생성 실패');
   for(let attempt=1;attempt<=2;attempt++){
-    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),48000);
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),85000);
     try{
       const fd=new FormData();fd.append('image',blob,'selfie.jpg');fd.append('style',typeof charStyle!=='undefined'?charStyle:'나답게');fd.append('variant',String(variant));
       const res=await fetch('/api/avatar/generate-v17',{method:'POST',body:fd,signal:controller.signal,cache:'no-store'});

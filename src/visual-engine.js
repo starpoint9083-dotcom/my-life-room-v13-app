@@ -1,5 +1,5 @@
 const VISUAL_MODEL="@cf/black-forest-labs/flux-2-klein-4b";
-const VISUAL_TIMEOUT_MS=45000;
+const VISUAL_TIMEOUT_MS=75000;
 const PREFIX="visual-v17/shared/";
 const POSES=["window","pet","relax","stretch"];
 function safeChoice(value,allowed,fallback){const s=String(value||"").trim();return allowed.includes(s)?s:fallback}

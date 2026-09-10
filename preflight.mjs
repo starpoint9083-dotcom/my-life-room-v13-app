@@ -28,7 +28,7 @@ for(const t of ["device_auth","habit_signals"]){if(!sql2.includes(`CREATE TABLE 
 for(const t of ["life_profiles","life_daily","clear_messages"]){if(!sql3.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`)}
 for(const key of ["const ACTIONS = [","const HIDDEN_CHANGES=[","const ASSET_MANIFEST ="]){if(!html.includes(key))errors.push(`missing engine ${key}`)}
 for(const key of ["실사용 엔진","맑은 나의 메시지","syncDaily","syncSmoking","syncCondition","riskTick"]){if(!runtime.includes(key))errors.push(`missing runtime feature ${key}`)}
-for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","48000","/api/avatar/generate-v17","loadVisual17"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar v17 bridge ${key}`)}
+for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","85000","/api/avatar/generate-v17","loadVisual17"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar v17 bridge ${key}`)}
 for(const key of ["setupReset","fullReset","stopSaving","/api/life/reset","localStorage.removeItem","caches.keys()","window.resetAll=setupReset","window.__resetLock"]){if(!resetRuntime.includes(key))errors.push(`missing authoritative reset feature ${key}`)}
 for(const key of ["cutout","avgCorner","ensureAsset","enhanceAvatar","enhanceRoom","enhancePet","applyVisual","visual17"]){if(!visualRuntime.includes(key))errors.push(`missing premium visual runtime ${key}`)}
 for(const key of ["roomPrompt","petPrompt","avatarPrompt","posePrompt","VISUAL_MODEL","visual-v17/shared/","AVATAR_ASSETS.put","Photorealistic"]){if(!visual.includes(key))errors.push(`missing premium visual server ${key}`)}

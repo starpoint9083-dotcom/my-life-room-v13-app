@@ -88,7 +88,22 @@ async function enhanceAvatar(){
 }
 async function ensureAsset(payload){
   const key=JSON.stringify(payload);if(memory.has("asset:"+key))return memory.get("asset:"+key);
-  const p=(async()=>{const r=await fetch("/api/visual/ensure",{method:"POST",cache:"no-store",headers:auth({"content-type":"application/json"}),body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok||!d.url)throw new Error(d.error||`visual ${r.status}`);return d.url})();
+  const p=(async()=>{
+    let lastError=new Error("비주얼 생성 실패");
+    for(let attempt=1;attempt<=2;attempt++){
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),85000);
+      try{
+        const r=await fetch("/api/visual/ensure",{method:"POST",cache:"no-store",signal:controller.signal,headers:auth({"content-type":"application/json"}),body:JSON.stringify(payload)});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok||!d.ok||!d.url)throw new Error(d.error||`visual ${r.status}`);
+        return d.url;
+      }catch(e){
+        lastError=e?.name==="AbortError"?new Error("비주얼 생성 시간이 길어 자동으로 다시 시도합니다."):e;
+        if(attempt<2)await new Promise(resolve=>setTimeout(resolve,1200));
+      }finally{clearTimeout(timer)}
+    }
+    throw lastError;
+  })();
   memory.set("asset:"+key,p);try{return await p}catch(e){memory.delete("asset:"+key);throw e}
 }
 async function enhanceRoom(){
