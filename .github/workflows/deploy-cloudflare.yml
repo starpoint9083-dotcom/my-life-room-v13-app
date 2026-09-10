@@ -23,6 +23,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Static syntax and production dependency audit
+        run: |
+          set -euo pipefail
+          node --check src/index.js
+          node --check preflight.mjs
+          node --check scripts/prepare-cloudflare.mjs
+          node --check scripts/verify-deployment.mjs
+          npm audit --omit=dev --audit-level=high
+
       - name: Ten-pass V13 preflight and Wrangler dry-run
         run: |
           set -euo pipefail
