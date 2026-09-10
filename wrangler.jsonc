@@ -4,6 +4,13 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-10",
   "ai": { "binding": "AI" },
+  "workflows": [
+    {
+      "name": "my-life-room-cinema-v23",
+      "binding": "CINEMA_WORKFLOW",
+      "class_name": "CinemaBatchWorkflow"
+    }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
