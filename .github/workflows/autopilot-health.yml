@@ -1,0 +1,105 @@
+name: Autopilot Live Health Guard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 20 * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: autopilot-live-health
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PRODUCTION_URL: https://my-life-room-v13-live-0910.starpoint9083.workers.dev
+      GH_TOKEN: ${{ github.token }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate main before any recovery deploy
+        id: local
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node --check src/index.js
+          node --check src/life-engine.js
+          node --check src/visual-engine.js
+          node --check public/runtime-v14.js
+          node --check public/avatar-runtime-v15.js
+          node --check public/reset-runtime-v16.js
+          node --check public/visual-runtime-v17.js
+          node --check public/room-runtime-v19.js
+          node --check public/pose-runtime-v20.js
+          node --check preflight.mjs
+          node --check scripts/prepare-cloudflare.mjs
+          node --check scripts/verify-deployment.mjs
+          node --check scripts/check-live.mjs
+          npm audit --omit=dev --audit-level=high
+          for i in $(seq 1 10); do
+            echo "=== health-guard validation $i/10 ==="
+            npm run check
+            rm -rf .wrangler-health-dry-run
+            npx wrangler deploy --dry-run --outdir .wrangler-health-dry-run
+          done
+
+      - name: Report unsafe main and stop
+        if: steps.local.outcome == 'failure'
+        run: |
+          TITLE='[AUTOPILOT] Main validation failure'
+          EXISTING="$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title=="[AUTOPILOT] Main validation failure") | .number' | head -n1)"
+          BODY="자동 점검에서 main의 문법/preflight/dry-run 검증이 실패했습니다. 안전을 위해 자동 재배포를 중단했습니다. Run: $RUN_URL"
+          if [ -n "$EXISTING" ]; then gh issue comment "$EXISTING" --body "$BODY"; else gh issue create --title "$TITLE" --body "$BODY"; fi
+          exit 1
+
+      - name: Check live production with retries
+        if: steps.local.outcome == 'success'
+        id: live
+        continue-on-error: true
+        run: node scripts/check-live.mjs "$PRODUCTION_URL"
+
+      - name: Self-heal by redeploying verified main
+        if: steps.live.outcome == 'failure'
+        id: redeploy
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:prepare
+
+      - name: Full end-to-end verification after recovery deploy
+        if: steps.live.outcome == 'failure' && steps.redeploy.outcome == 'success'
+        id: e2e
+        continue-on-error: true
+        run: npm run deploy:verify
+
+      - name: Report unresolved live failure
+        if: always() && steps.local.outcome == 'success' && steps.live.outcome == 'failure' && (steps.redeploy.outcome == 'failure' || steps.e2e.outcome == 'failure')
+        run: |
+          TITLE='[AUTOPILOT] Live health failure'
+          EXISTING="$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title=="[AUTOPILOT] Live health failure") | .number' | head -n1)"
+          BODY="실서비스 점검 실패 후 자동 재배포/끝단 검증으로도 복구되지 않았습니다. Run: $RUN_URL"
+          if [ -n "$EXISTING" ]; then gh issue comment "$EXISTING" --body "$BODY"; else gh issue create --title "$TITLE" --body "$BODY"; fi
+          exit 1
+
+      - name: Close recovered live-health issue
+        if: always() && (steps.live.outcome == 'success' || steps.e2e.outcome == 'success')
+        run: |
+          EXISTING="$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title=="[AUTOPILOT] Live health failure") | .number' | head -n1)"
+          if [ -n "$EXISTING" ]; then gh issue close "$EXISTING" --comment "자동 점검/복구가 정상 통과했습니다. Run: $RUN_URL"; fi
