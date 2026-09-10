@@ -2,176 +2,42 @@ import {handleLifeRoute} from "./life-engine.js";
 
 const MODEL="@cf/black-forest-labs/flux-2-klein-4b";
 const AI_TIMEOUT_MS=35000;
-
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:JSON_HEADERS})}
 function safeDeviceId(value){const s=String(value||"").trim();return s&&s.length<=128&&/^[A-Za-z0-9._:-]+$/.test(s)?s:null}
 function safeToken(value){const s=String(value||"").trim();return s&&s.length>=24&&s.length<=160&&/^[A-Za-z0-9._:-]+$/.test(s)?s:null}
-async function sha256Hex(text){
-  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf),b=>b.toString(16).padStart(2,"0")).join("");
-}
+async function sha256Hex(text){const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));return Array.from(new Uint8Array(buf),b=>b.toString(16).padStart(2,"0")).join("")}
 async function ensureAuth(request,env,allowCreate=true){
-  if(!env.DB)return {ok:false,response:json({ok:false,error:"D1 binding is not connected."},503)};
-  const deviceId=safeDeviceId(request.headers.get("x-device-id"));
-  const token=safeToken(request.headers.get("x-device-token"));
-  if(!deviceId||!token)return {ok:false,response:json({ok:false,error:"Device credentials missing"},401)};
-  const tokenHash=await sha256Hex(token);
-  const row=await env.DB.prepare("SELECT token_hash FROM device_auth WHERE device_id=?1").bind(deviceId).first();
-  if(!row){
-    if(!allowCreate)return {ok:false,response:json({ok:false,error:"Device not registered"},401)};
-    await env.DB.prepare("INSERT INTO device_auth (device_id,token_hash) VALUES (?1,?2)").bind(deviceId,tokenHash).run();
-  }else if(row.token_hash!==tokenHash){
-    return {ok:false,response:json({ok:false,error:"Invalid device credentials"},403)};
-  }
-  await env.DB.prepare("UPDATE device_auth SET last_seen_at=datetime('now') WHERE device_id=?1").bind(deviceId).run();
-  return {ok:true,deviceId};
+ if(!env.DB)return {ok:false,response:json({ok:false,error:"D1 binding is not connected."},503)};
+ const deviceId=safeDeviceId(request.headers.get("x-device-id")),token=safeToken(request.headers.get("x-device-token"));
+ if(!deviceId||!token)return {ok:false,response:json({ok:false,error:"Device credentials missing"},401)};
+ const tokenHash=await sha256Hex(token),row=await env.DB.prepare("SELECT token_hash FROM device_auth WHERE device_id=?1").bind(deviceId).first();
+ if(!row){if(!allowCreate)return {ok:false,response:json({ok:false,error:"Device not registered"},401)};await env.DB.prepare("INSERT INTO device_auth (device_id,token_hash) VALUES (?1,?2)").bind(deviceId,tokenHash).run()}
+ else if(row.token_hash!==tokenHash)return {ok:false,response:json({ok:false,error:"Invalid device credentials"},403)};
+ await env.DB.prepare("UPDATE device_auth SET last_seen_at=datetime('now') WHERE device_id=?1").bind(deviceId).run();return {ok:true,deviceId}
 }
-
 function stylePrompt(style,variant){
-  const styleMap={
-    "나답게":"natural, recognizable, warm and realistic",
-    "더 예쁘게":"more polished and attractive while preserving identity",
-    "더 멋지게":"confident, stylish and cool while preserving identity",
-    "더 귀엽게":"friendly, charming and slightly cute while preserving adult identity",
-    "세련된 현실형":"premium, sophisticated, modern and realistic"
-  };
-  const variants=["natural relaxed expression, refined casual outfit","bright approachable expression, premium everyday outfit","calm confident expression, sophisticated modern outfit"];
-  const v=Math.max(0,Math.min(2,Number.isFinite(Number(variant))?Number(variant):0));
-  const tone=styleMap[style]||styleMap["나답게"];
-  return [
-    "Use input image 0 as the identity reference for the same adult person.",
-    "Preserve recognizable facial identity, age range, key facial proportions, hair identity and skin tone.",
-    "Create one full-body app avatar for a premium lifestyle habit app.",
-    `Direction: ${tone}; ${variants[v]}.`,
-    "Semi-realistic high-end character illustration, detailed face, natural human proportions, tasteful contemporary styling.",
-    "Standing relaxed, front three-quarter view, whole body visible, hands natural, no text, no logo.",
-    "Simple light neutral studio background with strong subject separation.",
-    "Do not create a different person. Do not make the person look like a child."
-  ].join(" ");
+ const styleMap={"나답게":"natural, recognizable, warm and realistic","더 예쁘게":"more polished and attractive while preserving identity","더 멋지게":"confident, stylish and cool while preserving identity","더 귀엽게":"friendly, charming and slightly cute while preserving adult identity","세련된 현실형":"premium, sophisticated, modern and realistic"};
+ const variants=["natural relaxed expression, refined casual outfit","bright approachable expression, premium everyday outfit","calm confident expression, sophisticated modern outfit"],v=Math.max(0,Math.min(2,Number.isFinite(Number(variant))?Number(variant):0)),tone=styleMap[style]||styleMap["나답게"];
+ return ["Use input image 0 as the identity reference for the same adult person.","Preserve recognizable facial identity, age range, key facial proportions, hair identity and skin tone.","Create one full-body app avatar for a premium lifestyle habit app.",`Direction: ${tone}; ${variants[v]}.`,"Semi-realistic high-end character illustration, detailed face, natural human proportions, tasteful contemporary styling.","Standing relaxed, front three-quarter view, whole body visible, hands natural, no text, no logo.","Simple light neutral studio background with strong subject separation.","Do not create a different person. Do not make the person look like a child."].join(" ")
 }
-async function withTimeout(promise,ms=AI_TIMEOUT_MS){
-  let timer;
-  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workers AI generation timed out.")),ms)});
-  try{return await Promise.race([promise,timeout])}finally{clearTimeout(timer)}
-}
-async function runFlux(ai,referenceFile,prompt,seed){
-  const form=new FormData();
-  form.append("prompt",prompt);form.append("input_image_0",referenceFile,"selfie.jpg");
-  form.append("width","512");form.append("height","768");form.append("guidance","3.5");form.append("seed",String(seed));
-  const serialized=new Response(form);
-  const result=await withTimeout(ai.run(MODEL,{multipart:{body:serialized.body,contentType:serialized.headers.get("content-type")}}));
-  if(!result||typeof result.image!=="string"||!result.image.length)throw new Error("Workers AI did not return an image.");
-  return `data:image/jpeg;base64,${result.image}`;
-}
+async function withTimeout(promise,ms=AI_TIMEOUT_MS){let timer;const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workers AI generation timed out.")),ms)});try{return await Promise.race([promise,timeout])}finally{clearTimeout(timer)}}
+async function runFlux(ai,referenceFile,prompt,seed){const form=new FormData();form.append("prompt",prompt);form.append("input_image_0",referenceFile,"selfie.jpg");form.append("width","512");form.append("height","768");form.append("guidance","3.5");form.append("seed",String(seed));const serialized=new Response(form);const result=await withTimeout(ai.run(MODEL,{multipart:{body:serialized.body,contentType:serialized.headers.get("content-type")}}));if(!result||typeof result.image!=="string"||!result.image.length)throw new Error("Workers AI did not return an image.");return `data:image/jpeg;base64,${result.image}`}
 async function generateAvatar(request,env){
-  if(!env.AI)return json({ok:false,error:"Workers AI binding (AI) is not connected."},503);
-  const data=await request.formData();const image=data.get("image");const style=String(data.get("style")||"나답게");
-  if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"사진 파일이 필요합니다."},400);
-  if(image.size>4000000)return json({ok:false,error:"사진 파일이 너무 큽니다."},413);
-  const seed=Math.floor(Math.random()*1000000000);
-  const variantRaw=data.get("variant");
-  try{
-    if(variantRaw!==null&&variantRaw!==undefined&&String(variantRaw)!==""){
-      const variant=Math.max(0,Math.min(2,Math.round(Number(variantRaw)||0)));
-      const imageData=await runFlux(env.AI,image,stylePrompt(style,variant),seed+variant*9973);
-      return json({ok:true,model:MODEL,image:imageData,variant});
-    }
-    const images=[];
-    for(let i=0;i<3;i++)images.push(await runFlux(env.AI,image,stylePrompt(style,i),seed+i*9973));
-    return json({ok:true,model:MODEL,images});
-  }catch(error){return json({ok:false,error:error?.message||"AI 생성 중 오류가 발생했습니다."},500)}
+ if(!env.AI)return json({ok:false,error:"Workers AI binding (AI) is not connected."},503);const data=await request.formData(),image=data.get("image"),style=String(data.get("style")||"나답게");if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"사진 파일이 필요합니다."},400);if(image.size>4000000)return json({ok:false,error:"사진 파일이 너무 큽니다."},413);const seed=Math.floor(Math.random()*1000000000),variantRaw=data.get("variant");
+ try{if(variantRaw!==null&&variantRaw!==undefined&&String(variantRaw)!==""){const variant=Math.max(0,Math.min(2,Math.round(Number(variantRaw)||0))),imageData=await runFlux(env.AI,image,stylePrompt(style,variant),seed+variant*9973);return json({ok:true,model:MODEL,image:imageData,variant})}const images=[];for(let i=0;i<3;i++)images.push(await runFlux(env.AI,image,stylePrompt(style,i),seed+i*9973));return json({ok:true,model:MODEL,images})}catch(error){return json({ok:false,error:error?.message||"AI 생성 중 오류가 발생했습니다."},500)}
 }
 async function saveAvatar(request,env){
-  const data=await request.formData();const image=data.get("image");const style=String(data.get("style")||"나답게");
-  const deviceId=safeDeviceId(data.get("device_id"));const token=safeToken(data.get("device_token"));
-  if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"저장할 본캐 이미지가 없습니다."},400);
-  if(!deviceId||!token)return json({ok:false,error:"Device credentials missing"},401);
-  const fakeReq=new Request(request.url,{headers:{"x-device-id":deviceId,"x-device-token":token}});
-  const auth=await ensureAuth(fakeReq,env,true);if(!auth.ok)return auth.response;
-  if(!env.AVATAR_ASSETS)return json({ok:true,stored:false,reason:"R2 binding is not configured yet."});
-  const key=`avatars/${deviceId}/${crypto.randomUUID()}/master.jpg`;
-  await env.AVATAR_ASSETS.put(key,image,{httpMetadata:{contentType:image.type||"image/jpeg"},customMetadata:{style,role:"master-avatar",deviceId,createdAt:new Date().toISOString()}});
-  await env.DB.prepare("INSERT INTO avatars (device_id,r2_key,style) VALUES (?1,?2,?3)").bind(deviceId,key,style).run();
-  return json({ok:true,stored:true,key});
+ const data=await request.formData(),image=data.get("image"),style=String(data.get("style")||"나답게"),deviceId=safeDeviceId(data.get("device_id")),token=safeToken(data.get("device_token"));if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"저장할 본캐 이미지가 없습니다."},400);if(!deviceId||!token)return json({ok:false,error:"Device credentials missing"},401);const fakeReq=new Request(request.url,{headers:{"x-device-id":deviceId,"x-device-token":token}}),auth=await ensureAuth(fakeReq,env,true);if(!auth.ok)return auth.response;if(!env.AVATAR_ASSETS)return json({ok:true,stored:false,reason:"R2 binding is not configured yet."});const key=`avatars/${deviceId}/${crypto.randomUUID()}/master.jpg`;await env.AVATAR_ASSETS.put(key,image,{httpMetadata:{contentType:image.type||"image/jpeg"},customMetadata:{style,role:"master-avatar",deviceId,createdAt:new Date().toISOString()}});await env.DB.prepare("INSERT INTO avatars (device_id,r2_key,style) VALUES (?1,?2,?3)").bind(deviceId,key,style).run();return json({ok:true,stored:true,key})
 }
-async function getState(request,env){
-  const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;
-  const row=await env.DB.prepare("SELECT state_json,updated_at FROM app_state WHERE device_id=?1").bind(auth.deviceId).first();
-  if(!row)return json({ok:true,state:null});
-  let state=null;try{state=JSON.parse(row.state_json)}catch(e){}
-  return json({ok:true,state,updated_at:row.updated_at});
-}
-async function putState(request,env){
-  const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;
-  const body=await request.json().catch(()=>null);
-  if(!body?.state||typeof body.state!=="object")return json({ok:false,error:"Invalid state payload"},400);
-  const stateJson=JSON.stringify(body.state);if(stateJson.length>120000)return json({ok:false,error:"State payload too large"},413);
-  await env.DB.prepare("INSERT INTO app_state (device_id,state_json,updated_at) VALUES (?1,?2,datetime('now')) ON CONFLICT(device_id) DO UPDATE SET state_json=excluded.state_json,updated_at=datetime('now')").bind(auth.deviceId,stateJson).run();
-  return json({ok:true});
-}
-async function addEvent(request,env){
-  const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;
-  const body=await request.json().catch(()=>null);const type=String(body?.type||"").slice(0,80);
-  if(!type)return json({ok:false,error:"Invalid event"},400);
-  const payload=JSON.stringify(body?.payload||{}).slice(0,20000);
-  await env.DB.prepare("INSERT INTO app_events (device_id,event_type,payload_json) VALUES (?1,?2,?3)").bind(auth.deviceId,type,payload).run();
-  return json({ok:true});
-}
-async function addSignal(request,env){
-  const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;
-  const body=await request.json().catch(()=>null);
-  const kind=String(body?.kind||"").slice(0,80);if(!kind)return json({ok:false,error:"Invalid signal"},400);
-  const amount=Number(body?.amount??1);const hour=Math.max(0,Math.min(23,Number(body?.local_hour??0)));const weekday=Math.max(0,Math.min(6,Number(body?.weekday??0)));
-  const meta=JSON.stringify(body?.meta||{}).slice(0,10000);
-  await env.DB.prepare("INSERT INTO habit_signals (device_id,signal_kind,amount,local_hour,weekday,meta_json) VALUES (?1,?2,?3,?4,?5,?6)").bind(auth.deviceId,kind,amount,hour,weekday,meta).run();
-  return json({ok:true});
-}
-async function riskProfile(request,env){
-  const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;
-  const rows=await env.DB.prepare(
-    "SELECT signal_kind,local_hour,COUNT(*) AS n,SUM(amount) AS amt FROM habit_signals WHERE device_id=?1 AND created_at>=datetime('now','-60 day') GROUP BY signal_kind,local_hour ORDER BY n DESC"
-  ).bind(auth.deviceId).all();
-  const alcohol={},smoking={};
-  for(const r of rows.results||[]){
-    if(String(r.signal_kind).startsWith("alcohol")||r.signal_kind==="daily_slip")alcohol[r.local_hour]=(alcohol[r.local_hour]||0)+Number(r.n||0);
-    if(String(r.signal_kind).startsWith("smoking"))smoking[r.local_hour]=(smoking[r.local_hour]||0)+Number(r.n||0);
-  }
-  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>Number(x[0]));
-  const total=(rows.results||[]).reduce((a,r)=>a+Number(r.n||0),0);
-  return json({ok:true,profile:{alcoholHours:top(alcohol),smokingHours:top(smoking),baseScore:Math.min(35,10+total),sampleCount:total}});
-}
+async function getState(request,env){const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const row=await env.DB.prepare("SELECT state_json,updated_at FROM app_state WHERE device_id=?1").bind(auth.deviceId).first();if(!row)return json({ok:true,state:null});let state=null;try{state=JSON.parse(row.state_json)}catch{}return json({ok:true,state,updated_at:row.updated_at})}
+async function putState(request,env){const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const body=await request.json().catch(()=>null);if(!body?.state||typeof body.state!=="object")return json({ok:false,error:"Invalid state payload"},400);const stateJson=JSON.stringify(body.state);if(stateJson.length>120000)return json({ok:false,error:"State payload too large"},413);await env.DB.prepare("INSERT INTO app_state (device_id,state_json,updated_at) VALUES (?1,?2,datetime('now')) ON CONFLICT(device_id) DO UPDATE SET state_json=excluded.state_json,updated_at=datetime('now')").bind(auth.deviceId,stateJson).run();return json({ok:true})}
+async function addEvent(request,env){const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const body=await request.json().catch(()=>null),type=String(body?.type||"").slice(0,80);if(!type)return json({ok:false,error:"Invalid event"},400);const payload=JSON.stringify(body?.payload||{}).slice(0,20000);await env.DB.prepare("INSERT INTO app_events (device_id,event_type,payload_json) VALUES (?1,?2,?3)").bind(auth.deviceId,type,payload).run();return json({ok:true})}
+async function addSignal(request,env){const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const body=await request.json().catch(()=>null),kind=String(body?.kind||"").slice(0,80);if(!kind)return json({ok:false,error:"Invalid signal"},400);const amount=Number(body?.amount??1),hour=Math.max(0,Math.min(23,Number(body?.local_hour??0))),weekday=Math.max(0,Math.min(6,Number(body?.weekday??0))),meta=JSON.stringify(body?.meta||{}).slice(0,10000);await env.DB.prepare("INSERT INTO habit_signals (device_id,signal_kind,amount,local_hour,weekday,meta_json) VALUES (?1,?2,?3,?4,?5,?6)").bind(auth.deviceId,kind,amount,hour,weekday,meta).run();return json({ok:true})}
+async function riskProfile(request,env){const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const rows=await env.DB.prepare("SELECT signal_kind,local_hour,COUNT(*) AS n,SUM(amount) AS amt FROM habit_signals WHERE device_id=?1 AND created_at>=datetime('now','-60 day') GROUP BY signal_kind,local_hour ORDER BY n DESC").bind(auth.deviceId).all(),alcohol={},smoking={};for(const r of rows.results||[]){if(String(r.signal_kind).startsWith("alcohol")||r.signal_kind==="daily_slip")alcohol[r.local_hour]=(alcohol[r.local_hour]||0)+Number(r.n||0);if(String(r.signal_kind).startsWith("smoking"))smoking[r.local_hour]=(smoking[r.local_hour]||0)+Number(r.n||0)}const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>Number(x[0])),total=(rows.results||[]).reduce((a,r)=>a+Number(r.n||0),0);return json({ok:true,profile:{alcoholHours:top(alcohol),smokingHours:top(smoking),baseScore:Math.min(35,10+total),sampleCount:total}})}
 async function assetResponseWithRuntime(request,env){
-  const response=await env.ASSETS.fetch(request);
-  if(request.method!=="GET"||!response.ok)return response;
-  const type=response.headers.get("content-type")||"";
-  if(!type.includes("text/html"))return response;
-  const html=await response.text();
-  let scripts="";
-  if(!html.includes("/runtime-v14.js"))scripts+='<script src="/runtime-v14.js" defer></script>';
-  if(!html.includes("/avatar-runtime-v15.js"))scripts+='<script src="/avatar-runtime-v15.js" defer></script>';
-  if(!html.includes("/reset-runtime-v16.js"))scripts+='<script src="/reset-runtime-v16.js" defer></script>';
-  if(!html.includes("/visual-runtime-v17.js"))scripts+='<script src="/visual-runtime-v17.js" defer></script>';
-  if(!html.includes("/interaction-runtime-v18.js"))scripts+='<script src="/interaction-runtime-v18.js" defer></script>';
-  if(!scripts)return new Response(html,response);
-  const injected=html.includes("</body>")?html.replace("</body>",scripts+"</body>"):html+scripts;
-  const headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");
-  return new Response(injected,{status:response.status,statusText:response.statusText,headers});
+ const response=await env.ASSETS.fetch(request);if(request.method!=="GET"||!response.ok)return response;const type=response.headers.get("content-type")||"";if(!type.includes("text/html"))return response;const html=await response.text();let scripts="";
+ for(const f of ["/runtime-v14.js","/avatar-runtime-v15.js","/reset-runtime-v16.js","/visual-runtime-v17.js","/room-runtime-v19.js"])if(!html.includes(f))scripts+=`<script src="${f}" defer></script>`;
+ if(!scripts)return new Response(html,response);const injected=html.includes("</body>")?html.replace("</body>",scripts+"</body>"):html+scripts,headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");return new Response(injected,{status:response.status,statusText:response.statusText,headers})
 }
-
-export default {
-  async fetch(request,env){
-    const url=new URL(request.url);
-    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true,avatarEngine:"v15",resetEngine:"v16",visualEngine:"v17",interactionEngine:"v18"});
-    if(url.pathname==="/api/avatar/generate"&&request.method==="POST")return generateAvatar(request,env);
-    if(url.pathname==="/api/avatar/save"&&request.method==="POST")return saveAvatar(request,env);
-    if(url.pathname==="/api/state"&&request.method==="GET")return getState(request,env);
-    if(url.pathname==="/api/state"&&request.method==="POST")return putState(request,env);
-    if(url.pathname==="/api/event"&&request.method==="POST")return addEvent(request,env);
-    if(url.pathname==="/api/signal"&&request.method==="POST")return addSignal(request,env);
-    if(url.pathname==="/api/risk-profile"&&request.method==="GET")return riskProfile(request,env);
-    const life=await handleLifeRoute(request,env,ensureAuth,json);if(life)return life;
-    if(url.pathname.startsWith("/api/"))return json({ok:false,error:"Not found"},404);
-    return assetResponseWithRuntime(request,env);
-  }
-};
+export default {async fetch(request,env){const url=new URL(request.url);if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true,avatarEngine:"v15",resetEngine:"v16",visualEngine:"v17",roomEngine:"v19"});if(url.pathname==="/api/avatar/generate"&&request.method==="POST")return generateAvatar(request,env);if(url.pathname==="/api/avatar/save"&&request.method==="POST")return saveAvatar(request,env);if(url.pathname==="/api/state"&&request.method==="GET")return getState(request,env);if(url.pathname==="/api/state"&&request.method==="POST")return putState(request,env);if(url.pathname==="/api/event"&&request.method==="POST")return addEvent(request,env);if(url.pathname==="/api/signal"&&request.method==="POST")return addSignal(request,env);if(url.pathname==="/api/risk-profile"&&request.method==="GET")return riskProfile(request,env);const life=await handleLifeRoute(request,env,ensureAuth,json);if(life)return life;if(url.pathname.startsWith("/api/"))return json({ok:false,error:"Not found"},404);return assetResponseWithRuntime(request,env)}};
