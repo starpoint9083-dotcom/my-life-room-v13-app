@@ -12,7 +12,7 @@ const specs=[
   ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"&&d?.resetEngine==="v16"],
   ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
   ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("/api/avatar/generate-v17")&&b.includes("loadVisual17")],
-  ["reset-runtime","/reset-runtime-v16.js",(r,d,b)=>b.includes("fullReset")&&b.includes("/api/life/reset")&&b.includes("localStorage.clear()")&&b.includes("window.resetAll=fullReset")],
+  ["reset-runtime","/reset-runtime-v16.js",(r,d,b)=>b.includes("setupReset")&&b.includes("fullReset")&&b.includes("scope:\"setup\"")&&b.includes("window.resetAll=setupReset")],
   ["visual-runtime","/visual-runtime-v17.js",(r,d,b)=>b.includes("enhanceAvatar")&&b.includes("enhanceRoom")&&b.includes("enhancePet")&&b.includes("cutout")&&b.includes("/api/visual/ensure")],
   ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
   ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v17-shell")&&b.includes("/visual-runtime-v17.js")]
@@ -90,17 +90,28 @@ async function verifyLifeEngine(){
   await jsonCall("/api/event",{method:"POST",headers:auth,body:{type:"ci-reset-test",payload:{ok:true}}});
   await jsonCall("/api/signal",{method:"POST",headers:auth,body:{kind:"smoking_count",amount:3,local_hour:20,weekday:4,meta:{ci:true}}});
   const avatar=await saveTestAvatar(deviceId,deviceToken);
-  const d=await jsonCall(`/api/life/summary?date=${date}`,{headers:auth}),s=d.summary||{},t=s.today||{};
-  const ok=s.dryStreak>=1&&s.smokeStreak>=1&&t.alcohol_result==="success"&&Number(t.smoking_count)===0&&Number(t.condition_score)===8&&s.latestMessage==="CI live-room verification message";
-  if(!ok)throw new Error(`life engine state mismatch before reset: ${JSON.stringify(s).slice(0,600)}`);
+  const before=await jsonCall(`/api/life/summary?date=${date}`,{headers:auth}),s=before.summary||{},t=s.today||{};
+  if(!(s.dryStreak>=1&&s.smokeStreak>=1&&t.alcohol_result==="success"&&Number(t.smoking_count)===0&&Number(t.condition_score)===8&&s.latestMessage==="CI live-room verification message"))throw new Error(`life engine state mismatch before reset: ${JSON.stringify(s).slice(0,600)}`);
   console.log(`PASS life-engine D1 read/write streaks dry=${s.dryStreak} smoke=${s.smokeStreak}`);console.log(`PASS R2 avatar saved before reset key=${avatar.key}`);
-  const reset=await jsonCall("/api/life/reset",{method:"POST",headers:auth});if(reset.reset!==true||Number(reset.r2Deleted)<1)throw new Error(`reset failed ${JSON.stringify(reset)}`);
+
+  const setupReset=await jsonCall("/api/life/reset",{method:"POST",headers:auth,body:{scope:"setup"}});
+  if(setupReset.reset!==true||setupReset.scope!=="setup"||Number(setupReset.r2Deleted)<1)throw new Error(`setup reset failed ${JSON.stringify(setupReset)}`);
+  const stateAfterSetup=await jsonCall("/api/state",{headers:auth});
+  if(stateAfterSetup.state!==null)throw new Error("app state survived setup reset");
+  const afterSetup=(await jsonCall(`/api/life/summary?date=${date}`,{headers:auth})).summary||{};
+  if(afterSetup.profile===null||afterSetup.today===null||afterSetup.latestMessage!=="CI live-room verification message"||Number(afterSetup.dryStreak)<1||Number(afterSetup.smokeStreak)<1)throw new Error(`life data was lost during setup reset: ${JSON.stringify(afterSetup).slice(0,600)}`);
+  const riskAfterSetup=(await jsonCall("/api/risk-profile",{headers:auth})).profile||{};
+  if(Number(riskAfterSetup.sampleCount)<1)throw new Error("habit signals were lost during setup reset");
+  console.log("PASS setup reset clears app state/avatar while preserving life history, risk signals, and device identity");
+
+  const full=await jsonCall("/api/life/reset",{method:"POST",headers:auth,body:{scope:"full"}});
+  if(full.reset!==true||full.scope!=="full")throw new Error(`full cleanup reset failed ${JSON.stringify(full)}`);
   const alternateToken=`ci.alt.${crypto.randomUUID().replaceAll("-","")}.${crypto.randomUUID().replaceAll("-","")}`,altAuth={"x-device-id":deviceId,"x-device-token":alternateToken,"content-type":"application/json"};
-  const stateAfter=await jsonCall("/api/state",{headers:altAuth});if(stateAfter.state!==null)throw new Error(`state survived reset`);
+  const stateAfter=await jsonCall("/api/state",{headers:altAuth});if(stateAfter.state!==null)throw new Error("state survived full reset");
   const summaryAfter=(await jsonCall(`/api/life/summary?date=${date}`,{headers:altAuth})).summary||{};
-  if(summaryAfter.profile!==null||summaryAfter.today!==null||summaryAfter.latestMessage!==null||Number(summaryAfter.dryStreak)!==0||Number(summaryAfter.smokeStreak)!==0||Number(summaryAfter.savedEstimate)!==0)throw new Error(`life data survived reset: ${JSON.stringify(summaryAfter).slice(0,600)}`);
-  const riskAfter=(await jsonCall("/api/risk-profile",{headers:altAuth})).profile||{};if(Number(riskAfter.sampleCount)!==0)throw new Error(`habit signals survived reset`);
-  console.log("PASS full reset clears D1 state/life/signals, R2 avatar, and old device auth");
+  if(summaryAfter.profile!==null||summaryAfter.today!==null||summaryAfter.latestMessage!==null||Number(summaryAfter.dryStreak)!==0||Number(summaryAfter.smokeStreak)!==0||Number(summaryAfter.savedEstimate)!==0)throw new Error(`life data survived full reset: ${JSON.stringify(summaryAfter).slice(0,600)}`);
+  const riskAfter=(await jsonCall("/api/risk-profile",{headers:altAuth})).profile||{};if(Number(riskAfter.sampleCount)!==0)throw new Error("habit signals survived full reset");
+  console.log("PASS CI-only full reset cleanup clears D1 life/signals/state and old device auth");
 }
 
 let last=[],shellReady=false;
