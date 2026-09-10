@@ -106,9 +106,53 @@ async function progressiveGenerate(){
   }
 }
 
+async function fullReset(){
+  try{
+    if(typeof toast==='function')toast('설정과 서버 기록을 초기화하고 있습니다.');
+    const id=localStorage.getItem('myroomDeviceId')||'';
+    const token=localStorage.getItem('myroomDeviceToken')||'';
+    if(id&&token&&location.protocol!=='file:'){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),15000);
+      let res;
+      try{
+        res=await fetch('/api/life/reset',{
+          method:'POST',
+          cache:'no-store',
+          signal:controller.signal,
+          headers:{'x-device-id':id,'x-device-token':token,'cache-control':'no-cache'}
+        });
+      }finally{clearTimeout(timer)}
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.ok||!data.reset)throw new Error(data.error||`서버 초기화 실패 (${res.status})`);
+    }
+
+    const localKeys=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);if(k&&k.startsWith('myroom'))localKeys.push(k);
+    }
+    localKeys.forEach(k=>localStorage.removeItem(k));
+    try{
+      const sessionKeys=[];
+      for(let i=0;i<sessionStorage.length;i++){
+        const k=sessionStorage.key(i);if(k&&k.startsWith('myroom'))sessionKeys.push(k);
+      }
+      sessionKeys.forEach(k=>sessionStorage.removeItem(k));
+    }catch{}
+    if('caches' in window){
+      try{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith('my-life-room')).map(k=>caches.delete(k)))}catch{}
+    }
+    location.replace('/?reset='+Date.now());
+  }catch(err){
+    if(typeof toast==='function')toast('초기화 실패: '+(err?.message||'서버 연결 오류'));
+    else alert('초기화 실패: '+(err?.message||'서버 연결 오류'));
+  }
+}
+
 function install(){
   if(typeof window.generateCandidates==='function')window.generateCandidates=progressiveGenerate;
   const btn=$("generateBtn");if(btn)btn.onclick=progressiveGenerate;
+  window.resetAll=fullReset;
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
