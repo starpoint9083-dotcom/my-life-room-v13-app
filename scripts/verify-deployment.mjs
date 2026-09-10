@@ -13,7 +13,7 @@ const specs=[
   ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")],
   ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"],
   ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
-  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("AbortController")&&b.includes("실패한 후보만 이어서")],
+  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("AbortController")&&b.includes("실패한 후보만 이어서")&&b.includes("fullReset")&&b.includes("/api/life/reset")],
   ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
   ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v15-shell")&&b.includes("/avatar-runtime-v15.js")]
 ];
@@ -56,11 +56,28 @@ async function verifyLifeEngine(){
   await jsonCall("/api/life/smoking",{method:"POST",headers:auth,body:{date,count:0,baseline:20}});
   await jsonCall("/api/life/condition",{method:"POST",headers:auth,body:{date,score:8}});
   await jsonCall("/api/life/message",{method:"POST",headers:auth,body:{text:"CI live-room verification message"}});
+  await jsonCall("/api/state",{method:"POST",headers:auth,body:{state:{habit:"둘 다",P:999,saved:12345}}});
+  await jsonCall("/api/event",{method:"POST",headers:auth,body:{type:"ci-reset-test",payload:{ok:true}}});
+  await jsonCall("/api/signal",{method:"POST",headers:auth,body:{kind:"smoking_count",amount:3,local_hour:20,weekday:4,meta:{ci:true}}});
+
   const d=await jsonCall(`/api/life/summary?date=${date}`,{headers:auth});
   const s=d.summary||{},t=s.today||{};
   const ok=s.dryStreak>=1&&s.smokeStreak>=1&&t.alcohol_result==="success"&&Number(t.smoking_count)===0&&Number(t.condition_score)===8&&s.latestMessage==="CI live-room verification message";
-  if(!ok)throw new Error(`life engine state mismatch: ${JSON.stringify(s).slice(0,600)}`);
+  if(!ok)throw new Error(`life engine state mismatch before reset: ${JSON.stringify(s).slice(0,600)}`);
   console.log(`PASS life-engine D1 read/write streaks dry=${s.dryStreak} smoke=${s.smokeStreak}`);
+
+  const reset=await jsonCall("/api/life/reset",{method:"POST",headers:auth});
+  if(reset.reset!==true)throw new Error(`reset endpoint did not confirm reset: ${JSON.stringify(reset)}`);
+
+  const stateAfter=await jsonCall("/api/state",{headers:auth});
+  if(stateAfter.state!==null)throw new Error(`state survived reset: ${JSON.stringify(stateAfter.state).slice(0,300)}`);
+  const summaryAfter=(await jsonCall(`/api/life/summary?date=${date}`,{headers:auth})).summary||{};
+  if(summaryAfter.profile!==null||summaryAfter.today!==null||summaryAfter.latestMessage!==null||Number(summaryAfter.dryStreak)!==0||Number(summaryAfter.smokeStreak)!==0||Number(summaryAfter.savedEstimate)!==0){
+    throw new Error(`life data survived reset: ${JSON.stringify(summaryAfter).slice(0,600)}`);
+  }
+  const riskAfter=(await jsonCall("/api/risk-profile",{headers:auth})).profile||{};
+  if(Number(riskAfter.sampleCount)!==0)throw new Error(`habit signals survived reset: ${JSON.stringify(riskAfter)}`);
+  console.log("PASS full reset clears app state, life data, events/signals identity state");
 }
 
 let last=[];
@@ -88,8 +105,8 @@ if(!shellReady){
 let lifeOk=false,lastLifeError="";
 for(let attempt=1;attempt<=3;attempt++){
   try{await verifyLifeEngine();lifeOk=true;break}
-  catch(e){lastLifeError=e.message;console.log(`WAIT life-engine attempt ${attempt}/3: ${lastLifeError}`);if(attempt<3)await sleep(3000)}
+  catch(e){lastLifeError=e.message;console.log(`WAIT life-engine/reset attempt ${attempt}/3: ${lastLifeError}`);if(attempt<3)await sleep(3000)}
 }
-if(!lifeOk){console.error(`Life engine end-to-end verification failed: ${lastLifeError}`);process.exit(1)}
+if(!lifeOk){console.error(`Life engine/reset end-to-end verification failed: ${lastLifeError}`);process.exit(1)}
 
 console.log("DEPLOYMENT VERIFIED");
