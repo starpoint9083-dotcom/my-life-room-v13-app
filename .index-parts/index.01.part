@@ -1,0 +1,121 @@
+ight:42px}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.actions button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 4px;font-size:11px}
+
+.growthCard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;margin-top:9px}
+.growthTop{display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:7px}
+.progress{height:9px;background:#eee8df;border-radius:999px;overflow:hidden}
+.progressFill{height:100%;width:18%;background:linear-gradient(90deg,#f3c88e,#dba96e);transition:.35s}
+.levels{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
+.levels button{border:1px solid var(--line);background:#fff;border-radius:11px;padding:8px 2px;font-size:9px}
+.levels button.active{background:#242424;color:#fff}
+.room.level2 .sofa{width:235px;background:#d2b597}
+.room.level2 .plant{transform:scale(1.08)}
+.room.level2 .table:after{box-shadow:20px 0 0 #70523d}
+.room.level3 .window{width:185px;height:154px}
+.room.level3 .sofa{width:250px;background:#ccb094}
+.room.level3 .rug{width:315px;background:#e1c9aa}
+.room.level3 .plant{transform:scale(1.18)}
+.room.level4 .window{width:215px;height:165px}
+.room.level4 .sofa{width:260px;background:#bca083}
+.room.level4 .rug{width:325px;background:#ead5b8}
+.room.level4 .plant{transform:scale(1.28)}
+.sparkle{position:absolute;right:22px;top:205px;z-index:7;font-size:22px;display:none}
+.room.level4 .sparkle{display:block}
+
+.engineCard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;margin-top:9px}
+.engineGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:7px}
+.engineMini{border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;font-size:9px;background:#fcfbf9}
+.engineMini b{display:block;font-size:12px;margin-top:2px}
+.hiddenList{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}
+.hiddenItem{border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff;font-size:10px;min-height:48px}
+.hiddenItem.found{background:#f5f0e8;text-decoration:none}
+
+.roomArt{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none}
+.room.hasArt .roomArt{display:block}
+.room.hasArt .window,.room.hasArt .rug,.room.hasArt .sofa,.room.hasArt .table{display:none}
+.avatarAsset{position:absolute;inset:-8px -18px -4px -18px;width:140px;height:212px;object-fit:contain;z-index:20;display:none;filter:drop-shadow(0 8px 6px rgba(0,0,0,.18))}
+.avatar.assetMode .avatarAsset{display:block}
+.avatar.assetMode .avatarFull,.avatar.assetMode .avatarPhoto,.avatar.assetMode .hairFallback,.avatar.assetMode .body,.avatar.assetMode .leg{display:none}
+.petAsset{position:absolute;inset:-8px -14px -8px -14px;width:110px;height:90px;object-fit:contain;z-index:20;display:none;filter:drop-shadow(0 5px 4px rgba(0,0,0,.14))}
+.pet.assetMode .petAsset{display:block}
+.pet.assetMode .petface{display:none}
+.assetBadge{position:absolute;right:9px;top:9px;z-index:40;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:999px;padding:5px 8px;font-size:9px;color:#6d665f}
+.sceneFade{animation:sceneFade .35s ease}
+@keyframes sceneFade{from{opacity:.55}to{opacity:1}}
+.hiddenProp{position:absolute;z-index:18;border-radius:50%;background:rgba(255,245,205,.5);box-shadow:0 0 16px rgba(255,220,130,.45);display:none}
+.hiddenProp.show{display:block}
+.hp1{left:52px;top:115px;width:22px;height:22px}
+.hp2{right:78px;bottom:145px;width:18px;height:18px}
+.hp3{left:240px;bottom:95px;width:16px;height:16px}
+.cloudState{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 8px;font-size:9px;color:#666;margin-top:5px}
+.cloudDot{width:7px;height:7px;border-radius:50%;background:#bbb}
+.cloudState.online .cloudDot{background:#7ead79}
+.cloudState.syncing .cloudDot{background:#e5b468}
+.cloudState.offline .cloudDot{background:#bdb6ae}
+.syncInfo{font-size:9px;color:#817a72;margin:5px 0 2px}
+
+.riskStrip{background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;margin:8px 0}
+.riskRow{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.riskMeter{height:7px;background:#eee8df;border-radius:999px;overflow:hidden;margin-top:7px}
+.riskFill{height:100%;width:22%;background:linear-gradient(90deg,#d9c8a5,#dfb46f);transition:.3s}
+.riskText{font-size:10px;color:#766f67}
+.installBtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 9px;font-size:9px;display:none}
+.installBtn.show{display:inline-block}
+.nav{position:fixed;bottom:0;width:min(100vw,440px);height:74px;background:rgba(255,255,255,.97);border-top:1px solid var(--line);display:none;grid-template-columns:repeat(4,1fr);z-index:100}.nav.show{display:grid}.nav button{border:0;background:transparent;font-size:11px;color:#444}.nav span{display:block;font-size:21px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:200;display:none;align-items:flex-end;justify-content:center}.overlay.show{display:flex}.sheet{width:min(100%,440px);background:#fff;border-radius:24px 24px 0 0;padding:18px 16px 28px;max-height:86vh;overflow:auto}.sheet h2{margin:0 0 7px}
+.message{background:#f7f3ed;border:1px solid var(--line);border-radius:18px;padding:15px;line-height:1.55;font-size:14px;margin:12px 0}.timer{font-size:42px;font-weight:900;text-align:center;margin:18px 0}
+.row{display:flex;gap:7px;flex-wrap:wrap}.chip{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#fafafa;font-size:11px}
+.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(12px);width:min(360px,84vw);background:#222;color:#fff;padding:11px 13px;border-radius:13px;opacity:0;transition:.2s;z-index:300;text-align:center;font-size:12px;pointer-events:none}.toast.show{opacity:1;transform:translateX(-50%)}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes wig{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}@keyframes nod{0%,100%{transform:rotate(0)}50%{transform:rotate(3deg)}}.bob{animation:bob .7s}.wig{animation:wig .7s}.nod{animation:nod .7s}
+</style>
+</head>
+<body>
+<div class="app">
+<section class="screen active" id="start">
+  <h1>내 삶 시작하기</h1>
+  <p>술과 담배를 끊은 시간이, 내가 원하는 삶의 모습으로 바뀝니다. 방은 밝고 단정한 기본공간에서 시작해 꾸준함과 함께 성장합니다.</p>
+  <div class="grid3">
+    <div class="option habit active" data-v="금주">🍷<b>금주</b></div>
+    <div class="option habit" data-v="금연">🚭<b>금연</b></div>
+    <div class="option habit" data-v="둘 다">✨<b>둘 다</b></div>
+  </div>
+  <div class="card">
+    <b>기본 기준</b>
+    <p>감량과 절약액 계산의 기준으로만 사용합니다.</p>
+    <div class="grid2">
+      <label class="small">평소 1회 술값<input id="alcoholCost" type="number" value="45000" style="width:100%;margin-top:5px;padding:10px;border:1px solid var(--line);border-radius:10px"></label>
+      <label class="small">하루 평균 담배<input id="smokeBase" type="number" value="20" style="width:100%;margin-top:5px;padding:10px;border:1px solid var(--line);border-radius:10px"></label>
+    </div>
+  </div>
+  <button class="big" onclick="go('character')">다음</button>
+</section>
+
+<section class="screen" id="character">
+  <h1>앱 속의 ‘나’를 만들어요</h1>
+  <p>사진을 넣고 스타일을 고른 뒤 후보 3개 중 하나를 본캐로 선택합니다.</p>
+  <label class="photoBox">
+    <span id="photoHint">📷 사진 찍기 또는 앨범에서 선택</span>
+    <img id="photoPreview" style="display:none">
+    <span class="photoNote">정면 사진 1장이 가장 좋습니다</span>
+    <input id="photoInput" type="file" accept="image/*" capture="user" hidden>
+  </label>
+  <div style="margin-top:10px">
+    <span class="pill charStyle active">나답게</span><span class="pill charStyle">더 예쁘게</span><span class="pill charStyle">더 멋지게</span><span class="pill charStyle">더 귀엽게</span><span class="pill charStyle">세련된 현실형</span>
+  </div>
+  <button class="big" id="generateBtn" onclick="generateCandidates()">본캐 후보 3개 실제 생성</button><div class="aiStatus" id="aiStatus"></div>
+  <div class="candidates" id="candidates">
+    <div class="candidate active" data-c="1" onclick="pickCandidate(1,this)"><div class="img"><span>후보 1</span></div><b>자연형</b></div>
+    <div class="candidate" data-c="2" onclick="pickCandidate(2,this)"><div class="img"><span>후보 2</span></div><b>밝고 부드러운형</b></div>
+    <div class="candidate" data-c="3" onclick="pickCandidate(3,this)"><div class="img"><span>후보 3</span></div><b>세련된 현실형</b></div>
+  </div>
+  <div class="heroNote" id="aiNote">Cloudflare에 배포하면 FLUX.2 klein 4B가 사진을 참고해 후보 3장을 실제 생성합니다. 로컬 파일로 열면 안전하게 데모 모드로 동작합니다.</div>
+  <button class="big alt" id="characterNext" style="display:none" onclick="go('roomSelect')">선택한 본캐로 계속</button>
+</section>
+
+<section class="screen" id="roomSelect">
+  <h1>내가 돌아올 공간</h1>
+  <p>방과 함께 살 펫을 선택합니다.</p>
+  <div class="grid3">
+    <div class="option roomOpt active" data-v="">☀️<b>햇살방</b></div>
+    <div class="option roomOpt" data-v="modern">🪟<b>모던룸</b></div>
+    <div class="option roomOpt" data-v="cozy">🧸<b>포근한 방
