@@ -6,15 +6,16 @@ if(!base){console.error("Usage: node scripts/verify-deployment.mjs https://your-
 base=base.replace(/\/$/,"");
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const specs=[
- ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")&&b.includes("/reset-runtime-v16.js")&&b.includes("/visual-runtime-v17.js")&&b.includes("/room-runtime-v19.js")],
- ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"&&d?.resetEngine==="v16"&&d?.visualEngine==="v17"&&d?.roomEngine==="v19"],
+ ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")&&b.includes("/reset-runtime-v16.js")&&b.includes("/visual-runtime-v17.js")&&b.includes("/room-runtime-v19.js")&&b.includes("/pose-runtime-v20.js")],
+ ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"&&d?.resetEngine==="v16"&&d?.visualEngine==="v17"&&d?.roomEngine==="v19"&&d?.poseEngine==="v20"],
  ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("/api/avatar/generate-v17")&&b.includes("loadVisual17")],
  ["reset-runtime","/reset-runtime-v16.js",(r,d,b)=>b.includes("setupReset")&&b.includes("fullReset")&&b.includes("stopSaving")&&b.includes("window.__resetLock")],
  ["visual-runtime","/visual-runtime-v17.js",(r,d,b)=>b.includes("enhanceAvatar")&&b.includes("enhanceRoom")&&b.includes("enhancePet")&&b.includes("cutout")&&b.includes("/api/visual/ensure")],
  ["room-runtime","/room-runtime-v19.js",(r,d,b)=>b.includes("moveActor")&&b.includes("poseActor")&&b.includes("movePet")&&b.includes("swayPlant")&&b.includes("v19Sun")&&b.includes("v19Wind")&&b.includes("navigator.share")&&b.includes("roomV19Audit")],
+ ["pose-runtime","/pose-runtime-v20.js",(r,d,b)=>b.includes("POSES")&&b.includes("ensurePose")&&b.includes("/api/avatar/pose")&&b.includes("poseV20")],
  ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
- ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v19-shell")&&b.includes("/visual-runtime-v17.js")&&b.includes("/room-runtime-v19.js")]
+ ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v20-shell")&&b.includes("/visual-runtime-v17.js")&&b.includes("/room-runtime-v19.js")&&b.includes("/pose-runtime-v20.js")]
 ];
 async function runCheck(name,path,predicate){try{const u=new URL(base+path);u.searchParams.set("verify_ts",Date.now().toString());const r=await fetch(u,{cache:"no-store",headers:{"cache-control":"no-cache"}}),body=await r.text();let data=null;try{data=JSON.parse(body)}catch{}return {name,ok:r.ok&&predicate(r,data,body),status:r.status,data,bodyPreview:body.slice(0,180)}}catch(e){return {name,ok:false,error:e.message}}}
 async function jsonCall(path,{method="GET",body,headers={}}={}){const r=await fetch(base+path,{method,cache:"no-store",headers:{"cache-control":"no-cache",...headers},body:body===undefined?undefined:JSON.stringify(body)}),d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(`${method} ${path} failed: ${r.status} ${JSON.stringify(d).slice(0,220)}`);return d}
@@ -38,4 +39,4 @@ if(!shellReady){console.error("Deployment verification failed after 60 seconds."
 try{await verifyAvatarAI()}catch(e){console.error(`Workers AI avatar v17 end-to-end verification failed: ${e.message}`);process.exit(1)}
 let lifeOk=false,lastLifeError="";for(let attempt=1;attempt<=3;attempt++){try{await verifyLifeEngine();lifeOk=true;break}catch(e){lastLifeError=e.message;console.log(`WAIT life/visual/reset attempt ${attempt}/3: ${lastLifeError}`);if(attempt<3)await sleep(3000)}}
 if(!lifeOk){console.error(`Life/visual/reset end-to-end verification failed: ${lastLifeError}`);process.exit(1)}
-console.log("DEPLOYMENT VERIFIED FULL ROOM V19");
+console.log("DEPLOYMENT VERIFIED FULL ROOM V20");
