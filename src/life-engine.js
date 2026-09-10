@@ -73,6 +73,27 @@ async function upsertDaily(env,deviceId,date,patch){
     "INSERT INTO life_daily (device_id,local_date,alcohol_result,smoking_count,smoking_baseline,condition_score,updated_at) VALUES (?1,?2,?3,?4,?5,?6,datetime('now')) ON CONFLICT(device_id,local_date) DO UPDATE SET alcohol_result=excluded.alcohol_result,smoking_count=excluded.smoking_count,smoking_baseline=excluded.smoking_baseline,condition_score=excluded.condition_score,updated_at=datetime('now')"
   ).bind(deviceId,date,next.alcohol_result,next.smoking_count,next.smoking_baseline,next.condition_score).run();
 }
+async function resetDevice(env,deviceId){
+  let r2Deleted=0;
+  if(env.AVATAR_ASSETS){
+    const rows=await env.DB.prepare("SELECT r2_key FROM avatars WHERE device_id=?1").bind(deviceId).all();
+    const keys=(rows.results||[]).map(r=>r.r2_key).filter(Boolean);
+    for(const key of keys){
+      try{await env.AVATAR_ASSETS.delete(key);r2Deleted++;}catch{}
+    }
+  }
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM clear_messages WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM life_daily WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM life_profiles WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM habit_signals WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM app_events WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM avatars WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM app_state WHERE device_id=?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM device_auth WHERE device_id=?1").bind(deviceId)
+  ]);
+  return {r2Deleted};
+}
 export async function handleLifeRoute(request,env,ensureAuth,json){
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/api/life/"))return null;
@@ -80,6 +101,10 @@ export async function handleLifeRoute(request,env,ensureAuth,json){
   const deviceId=auth.deviceId;
   const refDate=safeDate(url.searchParams.get("date"))||todaySeoul();
 
+  if(url.pathname==="/api/life/reset"&&request.method==="POST"){
+    const result=await resetDevice(env,deviceId);
+    return json({ok:true,reset:true,...result});
+  }
   if(url.pathname==="/api/life/summary"&&request.method==="GET"){
     return json({ok:true,summary:await summary(env,deviceId,refDate)});
   }
