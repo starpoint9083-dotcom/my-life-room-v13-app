@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import zlib from "node:zlib";
 
 let base=process.argv[2];
 if(!base && fs.existsSync("deployment.url.txt"))base=fs.readFileSync("deployment.url.txt","utf8").trim();
@@ -42,6 +43,62 @@ async function jsonCall(path,{method="GET",body,headers={}}={}){
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.ok)throw new Error(`${method} ${path} failed: ${r.status} ${JSON.stringify(d).slice(0,220)}`);
   return d;
+}
+
+function crc32(buffer){
+  let c=0xffffffff;
+  for(const byte of buffer){
+    c^=byte;
+    for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);
+  }
+  return (c^0xffffffff)>>>0;
+}
+function pngChunk(type,data){
+  const t=Buffer.from(type,"ascii"),len=Buffer.alloc(4),crc=Buffer.alloc(4);
+  len.writeUInt32BE(data.length);crc.writeUInt32BE(crc32(Buffer.concat([t,data])));
+  return Buffer.concat([len,t,data,crc]);
+}
+function makeFacePng(width=256,height=256){
+  const row=width*3+1,raw=Buffer.alloc(row*height);
+  for(let y=0;y<height;y++){
+    const off=y*row;raw[off]=0;
+    for(let x=0;x<width;x++){
+      let r=238,g=241,b=244;
+      const dx=(x-128)/72,dy=(y-122)/88;
+      if(dx*dx+dy*dy<1){r=222;g=176;b=143;}
+      if(y<67&&Math.abs(x-128)<64){r=57;g=47;b=43;}
+      const eye=((x-102)**2+(y-116)**2<22)||((x-154)**2+(y-116)**2<22);
+      if(eye){r=45;g=35;b=32;}
+      if(y>155&&y<162&&Math.abs(x-128)<28){r=132;g=68;b=65;}
+      const i=off+1+x*3;raw[i]=r;raw[i+1]=g;raw[i+2]=b;
+    }
+  }
+  const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(width,0);ihdr.writeUInt32BE(height,4);ihdr[8]=8;ihdr[9]=2;
+  return Buffer.concat([
+    Buffer.from([137,80,78,71,13,10,26,10]),
+    pngChunk("IHDR",ihdr),
+    pngChunk("IDAT",zlib.deflateSync(raw)),
+    pngChunk("IEND",Buffer.alloc(0))
+  ]);
+}
+
+async function verifyAvatarAI(){
+  const fd=new FormData();
+  fd.append("image",new Blob([makeFacePng()],{type:"image/png"}),"ci-face.png");
+  fd.append("style","나답게");
+  fd.append("variant","0");
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),50000);
+  try{
+    const r=await fetch(base+"/api/avatar/generate",{method:"POST",body:fd,cache:"no-store",signal:controller.signal});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.ok||typeof d.image!=="string"||!d.image.startsWith("data:image/jpeg;base64,")){
+      throw new Error(`avatar AI generation failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);
+    }
+    const bytes=Buffer.from(d.image.split(",")[1]||"","base64");
+    if(bytes.length<1000)throw new Error(`avatar AI image too small: ${bytes.length} bytes`);
+    console.log(`PASS Workers AI real avatar generation bytes=${bytes.length}`);
+  }finally{clearTimeout(timer)}
 }
 
 async function saveTestAvatar(deviceId,deviceToken){
@@ -119,6 +176,8 @@ if(!shellReady){
   for(const c of last)console.error(`${c.name}: status=${c.status||"n/a"} error=${c.error||""}`);
   process.exit(1);
 }
+
+try{await verifyAvatarAI()}catch(e){console.error(`Workers AI avatar end-to-end verification failed: ${e.message}`);process.exit(1)}
 
 let lifeOk=false,lastLifeError="";
 for(let attempt=1;attempt<=3;attempt++){
