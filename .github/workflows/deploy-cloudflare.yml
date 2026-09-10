@@ -38,6 +38,8 @@ jobs:
           node --check preflight.mjs
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
+          node --check scripts/check-live.mjs
+          node --check scripts/ai-autopilot.mjs
           npm audit --omit=dev --audit-level=high
 
       - name: Ten-pass V13 preflight and Wrangler dry-run

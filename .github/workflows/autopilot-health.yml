@@ -2,6 +2,13 @@ name: Autopilot Live Health Guard
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/autopilot-health.yml'
+      - 'scripts/check-live.mjs'
+      - 'deployment.production.url.txt'
   schedule:
     - cron: '20 20 * * *'
 
@@ -52,6 +59,7 @@ jobs:
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
           node --check scripts/check-live.mjs
+          node --check scripts/ai-autopilot.mjs
           npm audit --omit=dev --audit-level=high
           for i in $(seq 1 10); do
             echo "=== health-guard validation $i/10 ==="

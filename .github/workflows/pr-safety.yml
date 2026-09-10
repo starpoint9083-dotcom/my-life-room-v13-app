@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout candidate
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -51,7 +53,7 @@ jobs:
       - name: Ten-pass preflight and Wrangler dry-run
         run: |
           set -euo pipefail
-          git diff --check origin/main...HEAD || true
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
           for i in $(seq 1 10); do
             echo "=== PR validation $i/10 ==="
             npm run check
