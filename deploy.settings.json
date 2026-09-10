@@ -1,0 +1,9 @@
+{
+  "worker_name": "my-life-room-v13",
+  "d1_name": "my-life-room-v13",
+  "d1_binding": "DB",
+  "r2_name": "my-life-room-assets-v13",
+  "r2_binding": "AVATAR_ASSETS",
+  "ai_binding": "AI",
+  "migrations_dir": "migrations"
+}
