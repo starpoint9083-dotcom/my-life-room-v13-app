@@ -1,130 +1,41 @@
 import fs from "node:fs";
 import zlib from "node:zlib";
-
 let base=process.argv[2];
-if(!base && fs.existsSync("deployment.url.txt"))base=fs.readFileSync("deployment.url.txt","utf8").trim();
+if(!base&&fs.existsSync("deployment.url.txt"))base=fs.readFileSync("deployment.url.txt","utf8").trim();
 if(!base){console.error("Usage: node scripts/verify-deployment.mjs https://your-worker.workers.dev");process.exit(2)}
 base=base.replace(/\/$/,"");
-
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const specs=[
-  ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")&&b.includes("/reset-runtime-v16.js")],
-  ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"&&d?.resetEngine==="v16"],
-  ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
-  ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("/api/avatar/generate-v17")&&b.includes("loadVisual17")],
-  ["reset-runtime","/reset-runtime-v16.js",(r,d,b)=>b.includes("setupReset")&&b.includes("fullReset")&&b.includes("scope:\"setup\"")&&b.includes("window.resetAll=setupReset")],
-  ["visual-runtime","/visual-runtime-v17.js",(r,d,b)=>b.includes("enhanceAvatar")&&b.includes("enhanceRoom")&&b.includes("enhancePet")&&b.includes("cutout")&&b.includes("/api/visual/ensure")],
-  ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
-  ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v17-shell")&&b.includes("/visual-runtime-v17.js")]
+ ["home","/",(r,d,b)=>b.includes("내 삶 시작하기")&&b.includes("/runtime-v14.js")&&b.includes("/avatar-runtime-v15.js")&&b.includes("/reset-runtime-v16.js")&&b.includes("/visual-runtime-v17.js")&&b.includes("/room-runtime-v19.js")],
+ ["health","/api/health",(r,d)=>d?.ok===true&&d?.ai===true&&d?.d1===true&&d?.r2===true&&d?.lifeEngine===true&&d?.avatarEngine==="v15"&&d?.resetEngine==="v16"&&d?.visualEngine==="v17"&&d?.roomEngine==="v19"],
+ ["runtime","/runtime-v14.js",(r,d,b)=>b.includes("실사용 엔진")&&b.includes("syncDaily")&&b.includes("맑은 나의 메시지")],
+ ["avatar-runtime","/avatar-runtime-v15.js",(r,d,b)=>b.includes("progressiveGenerate")&&b.includes("/api/avatar/generate-v17")&&b.includes("loadVisual17")],
+ ["reset-runtime","/reset-runtime-v16.js",(r,d,b)=>b.includes("setupReset")&&b.includes("fullReset")&&b.includes("stopSaving")&&b.includes("window.__resetLock")],
+ ["visual-runtime","/visual-runtime-v17.js",(r,d,b)=>b.includes("enhanceAvatar")&&b.includes("enhanceRoom")&&b.includes("enhancePet")&&b.includes("cutout")&&b.includes("/api/visual/ensure")],
+ ["room-runtime","/room-runtime-v19.js",(r,d,b)=>b.includes("moveActor")&&b.includes("poseActor")&&b.includes("movePet")&&b.includes("swayPlant")&&b.includes("v19Sun")&&b.includes("v19Wind")&&b.includes("navigator.share")&&b.includes("roomV19Audit")],
+ ["manifest","/manifest.webmanifest",(r,d,b)=>b.includes("나의 방")],
+ ["service-worker","/sw.js",(r,d,b)=>b.includes("my-life-room-v19-shell")&&b.includes("/visual-runtime-v17.js")&&b.includes("/room-runtime-v19.js")]
 ];
-
-async function runCheck(name,path,predicate){
-  try{
-    const u=new URL(base+path);u.searchParams.set("verify_ts",Date.now().toString());
-    const r=await fetch(u,{cache:"no-store",headers:{"cache-control":"no-cache"}});const body=await r.text();
-    let data=null;try{data=JSON.parse(body)}catch{}
-    return {name,ok:r.ok&&predicate(r,data,body),status:r.status,data,bodyPreview:body.slice(0,180)};
-  }catch(e){return {name,ok:false,error:e.message}}
-}
-async function jsonCall(path,{method="GET",body,headers={}}={}){
-  const r=await fetch(base+path,{method,cache:"no-store",headers:{"cache-control":"no-cache",...headers},body:body===undefined?undefined:JSON.stringify(body)});
-  const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(`${method} ${path} failed: ${r.status} ${JSON.stringify(d).slice(0,220)}`);return d;
-}
+async function runCheck(name,path,predicate){try{const u=new URL(base+path);u.searchParams.set("verify_ts",Date.now().toString());const r=await fetch(u,{cache:"no-store",headers:{"cache-control":"no-cache"}}),body=await r.text();let data=null;try{data=JSON.parse(body)}catch{}return {name,ok:r.ok&&predicate(r,data,body),status:r.status,data,bodyPreview:body.slice(0,180)}}catch(e){return {name,ok:false,error:e.message}}}
+async function jsonCall(path,{method="GET",body,headers={}}={}){const r=await fetch(base+path,{method,cache:"no-store",headers:{"cache-control":"no-cache",...headers},body:body===undefined?undefined:JSON.stringify(body)}),d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(`${method} ${path} failed: ${r.status} ${JSON.stringify(d).slice(0,220)}`);return d}
 function crc32(buffer){let c=0xffffffff;for(const byte of buffer){c^=byte;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0)}return (c^0xffffffff)>>>0}
 function pngChunk(type,data){const t=Buffer.from(type,"ascii"),len=Buffer.alloc(4),crc=Buffer.alloc(4);len.writeUInt32BE(data.length);crc.writeUInt32BE(crc32(Buffer.concat([t,data])));return Buffer.concat([len,t,data,crc])}
-function makeFacePng(width=256,height=256){
-  const row=width*3+1,raw=Buffer.alloc(row*height);
-  for(let y=0;y<height;y++){
-    const off=y*row;raw[off]=0;
-    for(let x=0;x<width;x++){
-      let r=238,g=241,b=244;const dx=(x-128)/72,dy=(y-122)/88;
-      if(dx*dx+dy*dy<1){r=222;g=176;b=143}if(y<67&&Math.abs(x-128)<64){r=57;g=47;b=43}
-      const eye=((x-102)**2+(y-116)**2<22)||((x-154)**2+(y-116)**2<22);if(eye){r=45;g=35;b=32}if(y>155&&y<162&&Math.abs(x-128)<28){r=132;g=68;b=65}
-      const i=off+1+x*3;raw[i]=r;raw[i+1]=g;raw[i+2]=b;
-    }
-  }
-  const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(width,0);ihdr.writeUInt32BE(height,4);ihdr[8]=8;ihdr[9]=2;
-  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),pngChunk("IHDR",ihdr),pngChunk("IDAT",zlib.deflateSync(raw)),pngChunk("IEND",Buffer.alloc(0))]);
-}
-async function verifyAvatarAI(){
-  const fd=new FormData();fd.append("image",new Blob([makeFacePng()],{type:"image/png"}),"ci-face.png");fd.append("style","나답게");fd.append("variant","0");
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
-  try{
-    const r=await fetch(base+"/api/avatar/generate-v17",{method:"POST",body:fd,cache:"no-store",signal:controller.signal});const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.ok||d.engine!=="v17"||typeof d.image!=="string"||!d.image.startsWith("data:image/jpeg;base64,"))throw new Error(`avatar v17 generation failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);
-    const bytes=Buffer.from(d.image.split(",")[1]||"","base64");if(bytes.length<10000)throw new Error(`avatar v17 image too small: ${bytes.length} bytes`);
-    console.log(`PASS Workers AI photoreal avatar v17 bytes=${bytes.length}`);
-  }finally{clearTimeout(timer)}
-}
-async function fetchVisualFile(url,label){
-  const r=await fetch(new URL(url,base),{cache:"no-store"});const buf=Buffer.from(await r.arrayBuffer());
-  if(!r.ok||buf.length<10000||!(r.headers.get("content-type")||"").startsWith("image/"))throw new Error(`${label} file invalid status=${r.status} bytes=${buf.length} type=${r.headers.get("content-type")}`);
-  console.log(`PASS ${label} R2 file bytes=${buf.length}`);return buf.length;
-}
-async function verifySharedVisuals(auth){
-  const room=await jsonCall("/api/visual/ensure",{method:"POST",headers:auth,body:{type:"room",roomStyle:"warm",level:1,time:"morning"}});
-  if(!room.url||!room.key?.startsWith("visual-v17/shared/rooms/"))throw new Error(`room visual response invalid ${JSON.stringify(room).slice(0,300)}`);
-  await fetchVisualFile(room.url,"premium room v17");
-  const pet=await jsonCall("/api/visual/ensure",{method:"POST",headers:auth,body:{type:"pet",petKind:"dog",petMode:"댕댕이형"}});
-  if(!pet.url||!pet.key?.startsWith("visual-v17/shared/pets/"))throw new Error(`pet visual response invalid ${JSON.stringify(pet).slice(0,300)}`);
-  await fetchVisualFile(pet.url,"premium pet v17");
-  console.log(`PASS visual-v17 shared cache roomCached=${Boolean(room.cached)} petCached=${Boolean(pet.cached)}`);
-}
-async function saveTestAvatar(deviceId,deviceToken){
-  const fd=new FormData();fd.append("image",new Blob(["reset-r2-test"],{type:"image/jpeg"}),"reset-test.jpg");fd.append("style","나답게");fd.append("device_id",deviceId);fd.append("device_token",deviceToken);
-  const r=await fetch(base+"/api/avatar/save",{method:"POST",body:fd,cache:"no-store"});const d=await r.json().catch(()=>({}));
-  if(!r.ok||!d.ok||d.stored!==true||!d.key)throw new Error(`R2 test avatar save failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);return d;
-}
+function makeFacePng(width=256,height=256){const row=width*3+1,raw=Buffer.alloc(row*height);for(let y=0;y<height;y++){const off=y*row;raw[off]=0;for(let x=0;x<width;x++){let r=238,g=241,b=244;const dx=(x-128)/72,dy=(y-122)/88;if(dx*dx+dy*dy<1){r=222;g=176;b=143}if(y<67&&Math.abs(x-128)<64){r=57;g=47;b=43}const eye=((x-102)**2+(y-116)**2<22)||((x-154)**2+(y-116)**2<22);if(eye){r=45;g=35;b=32}if(y>155&&y<162&&Math.abs(x-128)<28){r=132;g=68;b=65}const i=off+1+x*3;raw[i]=r;raw[i+1]=g;raw[i+2]=b}}const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(width,0);ihdr.writeUInt32BE(height,4);ihdr[8]=8;ihdr[9]=2;return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),pngChunk("IHDR",ihdr),pngChunk("IDAT",zlib.deflateSync(raw)),pngChunk("IEND",Buffer.alloc(0))])}
+async function verifyAvatarAI(){const fd=new FormData();fd.append("image",new Blob([makeFacePng()],{type:"image/png"}),"ci-face.png");fd.append("style","나답게");fd.append("variant","0");const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);try{const r=await fetch(base+"/api/avatar/generate-v17",{method:"POST",body:fd,cache:"no-store",signal:controller.signal}),d=await r.json().catch(()=>({}));if(!r.ok||!d.ok||d.engine!=="v17"||typeof d.image!=="string"||!d.image.startsWith("data:image/jpeg;base64,"))throw new Error(`avatar v17 generation failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);const bytes=Buffer.from(d.image.split(",")[1]||"","base64");if(bytes.length<10000)throw new Error(`avatar v17 image too small: ${bytes.length} bytes`);console.log(`PASS Workers AI photoreal avatar v17 bytes=${bytes.length}`)}finally{clearTimeout(timer)}}
+async function fetchVisualFile(url,label){const r=await fetch(new URL(url,base),{cache:"no-store"}),buf=Buffer.from(await r.arrayBuffer());if(!r.ok||buf.length<10000||!(r.headers.get("content-type")||"").startsWith("image/"))throw new Error(`${label} file invalid status=${r.status} bytes=${buf.length} type=${r.headers.get("content-type")}`);console.log(`PASS ${label} R2 file bytes=${buf.length}`);return buf.length}
+async function verifySharedVisuals(auth){const room=await jsonCall("/api/visual/ensure",{method:"POST",headers:auth,body:{type:"room",roomStyle:"warm",level:1,time:"morning"}});if(!room.url||!room.key?.startsWith("visual-v17/shared/rooms/"))throw new Error(`room visual response invalid ${JSON.stringify(room).slice(0,300)}`);await fetchVisualFile(room.url,"premium room v17");const pet=await jsonCall("/api/visual/ensure",{method:"POST",headers:auth,body:{type:"pet",petKind:"dog",petMode:"댕댕이형"}});if(!pet.url||!pet.key?.startsWith("visual-v17/shared/pets/"))throw new Error(`pet visual response invalid ${JSON.stringify(pet).slice(0,300)}`);await fetchVisualFile(pet.url,"premium pet v17");console.log(`PASS visual-v17 shared cache roomCached=${Boolean(room.cached)} petCached=${Boolean(pet.cached)}`)}
+async function saveTestAvatar(deviceId,deviceToken){const fd=new FormData();fd.append("image",new Blob(["reset-r2-test"],{type:"image/jpeg"}),"reset-test.jpg");fd.append("style","나답게");fd.append("device_id",deviceId);fd.append("device_token",deviceToken);const r=await fetch(base+"/api/avatar/save",{method:"POST",body:fd,cache:"no-store"}),d=await r.json().catch(()=>({}));if(!r.ok||!d.ok||d.stored!==true||!d.key)throw new Error(`R2 test avatar save failed: ${r.status} ${JSON.stringify(d).slice(0,300)}`);return d}
 async function verifyLifeEngine(){
-  const suffix=`${Date.now()}-${Math.floor(Math.random()*1e6)}`,deviceId=`ci-verify-${suffix}`,deviceToken=`ci.${crypto.randomUUID().replaceAll("-","")}.${crypto.randomUUID().replaceAll("-","")}`;
-  const auth={"x-device-id":deviceId,"x-device-token":deviceToken,"content-type":"application/json"};
-  const date=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-  await jsonCall(`/api/life/summary?date=${date}`,{headers:auth});
-  await verifySharedVisuals(auth);
-  await jsonCall("/api/life/profile",{method:"POST",headers:auth,body:{alcohol_start_date:date,smoking_start_date:date,alcohol_daily_cost:1000,smoking_daily_cost:500}});
-  await jsonCall("/api/life/daily",{method:"POST",headers:auth,body:{date,alcohol_result:"success"}});
-  await jsonCall("/api/life/smoking",{method:"POST",headers:auth,body:{date,count:0,baseline:20}});
-  await jsonCall("/api/life/condition",{method:"POST",headers:auth,body:{date,score:8}});
-  await jsonCall("/api/life/message",{method:"POST",headers:auth,body:{text:"CI live-room verification message"}});
-  await jsonCall("/api/state",{method:"POST",headers:auth,body:{state:{habit:"둘 다",P:999,saved:12345}}});
-  await jsonCall("/api/event",{method:"POST",headers:auth,body:{type:"ci-reset-test",payload:{ok:true}}});
-  await jsonCall("/api/signal",{method:"POST",headers:auth,body:{kind:"smoking_count",amount:3,local_hour:20,weekday:4,meta:{ci:true}}});
-  const avatar=await saveTestAvatar(deviceId,deviceToken);
-  const before=await jsonCall(`/api/life/summary?date=${date}`,{headers:auth}),s=before.summary||{},t=s.today||{};
-  if(!(s.dryStreak>=1&&s.smokeStreak>=1&&t.alcohol_result==="success"&&Number(t.smoking_count)===0&&Number(t.condition_score)===8&&s.latestMessage==="CI live-room verification message"))throw new Error(`life engine state mismatch before reset: ${JSON.stringify(s).slice(0,600)}`);
-  console.log(`PASS life-engine D1 read/write streaks dry=${s.dryStreak} smoke=${s.smokeStreak}`);console.log(`PASS R2 avatar saved before reset key=${avatar.key}`);
-
-  const setupReset=await jsonCall("/api/life/reset",{method:"POST",headers:auth,body:{scope:"setup"}});
-  if(setupReset.reset!==true||setupReset.scope!=="setup"||Number(setupReset.r2Deleted)<1)throw new Error(`setup reset failed ${JSON.stringify(setupReset)}`);
-  const stateAfterSetup=await jsonCall("/api/state",{headers:auth});
-  if(stateAfterSetup.state!==null)throw new Error("app state survived setup reset");
-  const afterSetup=(await jsonCall(`/api/life/summary?date=${date}`,{headers:auth})).summary||{};
-  if(afterSetup.profile===null||afterSetup.today===null||afterSetup.latestMessage!=="CI live-room verification message"||Number(afterSetup.dryStreak)<1||Number(afterSetup.smokeStreak)<1)throw new Error(`life data was lost during setup reset: ${JSON.stringify(afterSetup).slice(0,600)}`);
-  const riskAfterSetup=(await jsonCall("/api/risk-profile",{headers:auth})).profile||{};
-  if(Number(riskAfterSetup.sampleCount)<1)throw new Error("habit signals were lost during setup reset");
-  console.log("PASS setup reset clears app state/avatar while preserving life history, risk signals, and device identity");
-
-  const full=await jsonCall("/api/life/reset",{method:"POST",headers:auth,body:{scope:"full"}});
-  if(full.reset!==true||full.scope!=="full")throw new Error(`full cleanup reset failed ${JSON.stringify(full)}`);
-  const alternateToken=`ci.alt.${crypto.randomUUID().replaceAll("-","")}.${crypto.randomUUID().replaceAll("-","")}`,altAuth={"x-device-id":deviceId,"x-device-token":alternateToken,"content-type":"application/json"};
-  const stateAfter=await jsonCall("/api/state",{headers:altAuth});if(stateAfter.state!==null)throw new Error("state survived full reset");
-  const summaryAfter=(await jsonCall(`/api/life/summary?date=${date}`,{headers:altAuth})).summary||{};
-  if(summaryAfter.profile!==null||summaryAfter.today!==null||summaryAfter.latestMessage!==null||Number(summaryAfter.dryStreak)!==0||Number(summaryAfter.smokeStreak)!==0||Number(summaryAfter.savedEstimate)!==0)throw new Error(`life data survived full reset: ${JSON.stringify(summaryAfter).slice(0,600)}`);
-  const riskAfter=(await jsonCall("/api/risk-profile",{headers:altAuth})).profile||{};if(Number(riskAfter.sampleCount)!==0)throw new Error("habit signals survived full reset");
-  console.log("PASS CI-only full reset cleanup clears D1 life/signals/state and old device auth");
+ const suffix=`${Date.now()}-${Math.floor(Math.random()*1e6)}`,deviceId=`ci-verify-${suffix}`,deviceToken=`ci.${crypto.randomUUID().replaceAll("-","")}.${crypto.randomUUID().replaceAll("-","")}`,auth={"x-device-id":deviceId,"x-device-token":deviceToken,"content-type":"application/json"},date=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ await jsonCall(`/api/life/summary?date=${date}`,{headers:auth});await verifySharedVisuals(auth);await jsonCall("/api/life/profile",{method:"POST",headers:auth,body:{alcohol_start_date:date,smoking_start_date:date,alcohol_daily_cost:1000,smoking_daily_cost:500}});await jsonCall("/api/life/daily",{method:"POST",headers:auth,body:{date,alcohol_result:"success"}});await jsonCall("/api/life/smoking",{method:"POST",headers:auth,body:{date,count:0,baseline:20}});await jsonCall("/api/life/condition",{method:"POST",headers:auth,body:{date,score:8}});await jsonCall("/api/life/message",{method:"POST",headers:auth,body:{text:"CI live-room verification message"}});await jsonCall("/api/state",{method:"POST",headers:auth,body:{state:{habit:"둘 다",P:999,saved:12345}}});await jsonCall("/api/event",{method:"POST",headers:auth,body:{type:"ci-reset-test",payload:{ok:true}}});await jsonCall("/api/signal",{method:"POST",headers:auth,body:{kind:"smoking_count",amount:3,local_hour:20,weekday:4,meta:{ci:true}}});
+ const avatar=await saveTestAvatar(deviceId,deviceToken),before=await jsonCall(`/api/life/summary?date=${date}`,{headers:auth}),s=before.summary||{},t=s.today||{};if(!(s.dryStreak>=1&&s.smokeStreak>=1&&t.alcohol_result==="success"&&Number(t.smoking_count)===0&&Number(t.condition_score)===8&&s.latestMessage==="CI live-room verification message"))throw new Error(`life engine state mismatch before reset: ${JSON.stringify(s).slice(0,600)}`);console.log(`PASS life-engine D1 read/write streaks dry=${s.dryStreak} smoke=${s.smokeStreak}`);console.log(`PASS R2 avatar saved before reset key=${avatar.key}`);
+ const setupReset=await jsonCall("/api/life/reset",{method:"POST",headers:auth,body:{scope:"setup"}});if(setupReset.reset!==true||setupReset.scope!=="setup"||Number(setupReset.r2Deleted)<1)throw new Error(`setup reset failed ${JSON.stringify(setupReset)}`);const stateAfterSetup=await jsonCall("/api/state",{headers:auth});if(stateAfterSetup.state!==null)throw new Error("app state survived setup reset");const afterSetup=(await jsonCall(`/api/life/summary?date=${date}`,{headers:auth})).summary||{};if(afterSetup.profile===null||afterSetup.today===null||afterSetup.latestMessage!=="CI live-room verification message"||Number(afterSetup.dryStreak)<1||Number(afterSetup.smokeStreak)<1)throw new Error(`life data was lost during setup reset: ${JSON.stringify(afterSetup).slice(0,600)}`);const riskAfterSetup=(await jsonCall("/api/risk-profile",{headers:auth})).profile||{};if(Number(riskAfterSetup.sampleCount)<1)throw new Error("habit signals were lost during setup reset");console.log("PASS setup reset clears app state/avatar while preserving life history, risk signals, and device identity");
+ const full=await jsonCall("/api/life/reset",{method:"POST",headers:auth,body:{scope:"full"}});if(full.reset!==true||full.scope!=="full")throw new Error(`full cleanup reset failed ${JSON.stringify(full)}`);const alternateToken=`ci.alt.${crypto.randomUUID().replaceAll("-","")}.${crypto.randomUUID().replaceAll("-","")}`,altAuth={"x-device-id":deviceId,"x-device-token":alternateToken,"content-type":"application/json"},stateAfter=await jsonCall("/api/state",{headers:altAuth});if(stateAfter.state!==null)throw new Error("state survived full reset");const summaryAfter=(await jsonCall(`/api/life/summary?date=${date}`,{headers:altAuth})).summary||{};if(summaryAfter.profile!==null||summaryAfter.today!==null||summaryAfter.latestMessage!==null||Number(summaryAfter.dryStreak)!==0||Number(summaryAfter.smokeStreak)!==0||Number(summaryAfter.savedEstimate)!==0)throw new Error(`life data survived full reset: ${JSON.stringify(summaryAfter).slice(0,600)}`);const riskAfter=(await jsonCall("/api/risk-profile",{headers:altAuth})).profile||{};if(Number(riskAfter.sampleCount)!==0)throw new Error("habit signals survived full reset");console.log("PASS CI-only full reset cleanup clears D1 life/signals/state and old device auth")
 }
-
 let last=[],shellReady=false;
-for(let attempt=1;attempt<=12;attempt++){
-  console.log(`Verification attempt ${attempt}/12: ${base}`);last=[];
-  for(const [name,path,predicate] of specs){const c=await runCheck(name,path,predicate);last.push(c);console.log(`${c.ok?"PASS":"WAIT"} ${c.name}`,c.status||"",c.error||"");if(c.data)console.log(JSON.stringify(c.data));if(!c.ok&&c.bodyPreview)console.log(c.bodyPreview)}
-  if(last.every(c=>c.ok)){shellReady=true;break}if(attempt<12)await sleep(5000);
-}
+for(let attempt=1;attempt<=12;attempt++){console.log(`Verification attempt ${attempt}/12: ${base}`);last=[];for(const [name,path,predicate] of specs){const c=await runCheck(name,path,predicate);last.push(c);console.log(`${c.ok?"PASS":"WAIT"} ${c.name}`,c.status||"",c.error||"");if(c.data)console.log(JSON.stringify(c.data));if(!c.ok&&c.bodyPreview)console.log(c.bodyPreview)}if(last.every(c=>c.ok)){shellReady=true;break}if(attempt<12)await sleep(5000)}
 if(!shellReady){console.error("Deployment verification failed after 60 seconds.");for(const c of last)console.error(`${c.name}: status=${c.status||"n/a"} error=${c.error||""}`);process.exit(1)}
 try{await verifyAvatarAI()}catch(e){console.error(`Workers AI avatar v17 end-to-end verification failed: ${e.message}`);process.exit(1)}
-let lifeOk=false,lastLifeError="";
-for(let attempt=1;attempt<=3;attempt++){
-  try{await verifyLifeEngine();lifeOk=true;break}catch(e){lastLifeError=e.message;console.log(`WAIT life/visual/reset attempt ${attempt}/3: ${lastLifeError}`);if(attempt<3)await sleep(3000)}
-}
+let lifeOk=false,lastLifeError="";for(let attempt=1;attempt<=3;attempt++){try{await verifyLifeEngine();lifeOk=true;break}catch(e){lastLifeError=e.message;console.log(`WAIT life/visual/reset attempt ${attempt}/3: ${lastLifeError}`);if(attempt<3)await sleep(3000)}}
 if(!lifeOk){console.error(`Life/visual/reset end-to-end verification failed: ${lastLifeError}`);process.exit(1)}
-console.log("DEPLOYMENT VERIFIED PREMIUM VISUAL V17");
+console.log("DEPLOYMENT VERIFIED FULL ROOM V19");
