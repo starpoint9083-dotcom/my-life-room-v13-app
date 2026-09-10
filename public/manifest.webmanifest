@@ -1,0 +1,10 @@
+{
+  "name": "나의 방 - 금주·금연 생활 앱",
+  "short_name": "나의 방",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbfaf7",
+  "theme_color": "#fbfaf7",
+  "lang": "ko-KR",
+  "description": "술과 담배를 줄이고 끊은 시간이 내가 원하는 삶의 모습으로 바뀌는 생활형 앱"
+}
