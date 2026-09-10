@@ -1,6 +1,7 @@
 import {handleLifeRoute} from "./life-engine.js";
 
 const MODEL="@cf/black-forest-labs/flux-2-klein-4b";
+const AI_TIMEOUT_MS=35000;
 
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:JSON_HEADERS})}
@@ -36,24 +37,30 @@ function stylePrompt(style,variant){
     "세련된 현실형":"premium, sophisticated, modern and realistic"
   };
   const variants=["natural relaxed expression, refined casual outfit","bright approachable expression, premium everyday outfit","calm confident expression, sophisticated modern outfit"];
+  const v=Math.max(0,Math.min(2,Number.isFinite(Number(variant))?Number(variant):0));
   const tone=styleMap[style]||styleMap["나답게"];
   return [
     "Use input image 0 as the identity reference for the same adult person.",
     "Preserve recognizable facial identity, age range, key facial proportions, hair identity and skin tone.",
     "Create one full-body app avatar for a premium lifestyle habit app.",
-    `Direction: ${tone}; ${variants[variant]}.`,
+    `Direction: ${tone}; ${variants[v]}.`,
     "Semi-realistic high-end character illustration, detailed face, natural human proportions, tasteful contemporary styling.",
     "Standing relaxed, front three-quarter view, whole body visible, hands natural, no text, no logo.",
     "Simple light neutral studio background with strong subject separation.",
     "Do not create a different person. Do not make the person look like a child."
   ].join(" ");
 }
+async function withTimeout(promise,ms=AI_TIMEOUT_MS){
+  let timer;
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workers AI generation timed out.")),ms)});
+  try{return await Promise.race([promise,timeout])}finally{clearTimeout(timer)}
+}
 async function runFlux(ai,referenceFile,prompt,seed){
   const form=new FormData();
   form.append("prompt",prompt);form.append("input_image_0",referenceFile,"selfie.jpg");
   form.append("width","512");form.append("height","768");form.append("guidance","3.5");form.append("seed",String(seed));
   const serialized=new Response(form);
-  const result=await ai.run(MODEL,{multipart:{body:serialized.body,contentType:serialized.headers.get("content-type")}});
+  const result=await withTimeout(ai.run(MODEL,{multipart:{body:serialized.body,contentType:serialized.headers.get("content-type")}}));
   if(!result||typeof result.image!=="string"||!result.image.length)throw new Error("Workers AI did not return an image.");
   return `data:image/jpeg;base64,${result.image}`;
 }
@@ -63,8 +70,17 @@ async function generateAvatar(request,env){
   if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"사진 파일이 필요합니다."},400);
   if(image.size>4000000)return json({ok:false,error:"사진 파일이 너무 큽니다."},413);
   const seed=Math.floor(Math.random()*1000000000);
-  try{const images=await Promise.all([0,1,2].map(i=>runFlux(env.AI,image,stylePrompt(style,i),seed+i*9973)));return json({ok:true,model:MODEL,images})}
-  catch(error){return json({ok:false,error:error?.message||"AI 생성 중 오류가 발생했습니다."},500)}
+  const variantRaw=data.get("variant");
+  try{
+    if(variantRaw!==null&&variantRaw!==undefined&&String(variantRaw)!==""){
+      const variant=Math.max(0,Math.min(2,Math.round(Number(variantRaw)||0)));
+      const imageData=await runFlux(env.AI,image,stylePrompt(style,variant),seed+variant*9973);
+      return json({ok:true,model:MODEL,image:imageData,variant});
+    }
+    const images=[];
+    for(let i=0;i<3;i++)images.push(await runFlux(env.AI,image,stylePrompt(style,i),seed+i*9973));
+    return json({ok:true,model:MODEL,images});
+  }catch(error){return json({ok:false,error:error?.message||"AI 생성 중 오류가 발생했습니다."},500)}
 }
 async function saveAvatar(request,env){
   const data=await request.formData();const image=data.get("image");const style=String(data.get("style")||"나답게");
@@ -131,8 +147,11 @@ async function assetResponseWithRuntime(request,env){
   const type=response.headers.get("content-type")||"";
   if(!type.includes("text/html"))return response;
   const html=await response.text();
-  if(html.includes("/runtime-v14.js"))return new Response(html,response);
-  const injected=html.includes("</body>")?html.replace("</body>",'<script src="/runtime-v14.js" defer></script></body>'):html+'<script src="/runtime-v14.js" defer></script>';
+  let scripts="";
+  if(!html.includes("/runtime-v14.js"))scripts+='<script src="/runtime-v14.js" defer></script>';
+  if(!html.includes("/avatar-runtime-v15.js"))scripts+='<script src="/avatar-runtime-v15.js" defer></script>';
+  if(!scripts)return new Response(html,response);
+  const injected=html.includes("</body>")?html.replace("</body>",scripts+"</body>"):html+scripts;
   const headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");
   return new Response(injected,{status:response.status,statusText:response.statusText,headers});
 }
@@ -140,7 +159,7 @@ async function assetResponseWithRuntime(request,env){
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
-    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true});
+    if(url.pathname==="/api/health"&&request.method==="GET")return json({ok:true,ai:Boolean(env.AI),r2:Boolean(env.AVATAR_ASSETS),d1:Boolean(env.DB),model:MODEL,lifeEngine:true,avatarEngine:"v15"});
     if(url.pathname==="/api/avatar/generate"&&request.method==="POST")return generateAvatar(request,env);
     if(url.pathname==="/api/avatar/save"&&request.method==="POST")return saveAvatar(request,env);
     if(url.pathname==="/api/state"&&request.method==="GET")return getState(request,env);
