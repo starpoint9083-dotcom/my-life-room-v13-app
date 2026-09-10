@@ -67,6 +67,47 @@ async function progressiveGenerate(){
     }else{const next=$("characterNext");if(next)next.style.display='none';setStatus(`${completed}/3개 완료. 버튼을 다시 누르면 실패한 후보만 이어서 만듭니다.`)}
   }catch(err){setStatus('생성 오류: '+(err?.message||'알 수 없는 오류')+' — 사진은 그대로 보존됩니다.')}finally{btn.disabled=false}
 }
+function resetCandidateUI(){
+  try{generatedCandidates=[];selectedAvatar=null}catch{}
+  const c=$("candidates");if(c)c.classList.remove('show');
+  const n=$("characterNext");if(n)n.style.display='none';
+}
+function applyChosenPhoto(file){
+  if(!file)return;
+  if(!String(file.type||'').startsWith('image/')){setStatus('이미지 파일을 선택해주세요.');return}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{photoData=ev.target.result}catch{}
+    const preview=$("photoPreview"),hint=$("photoHint");
+    if(preview){preview.src=ev.target.result;preview.style.display='block'}
+    if(hint)hint.style.display='none';
+    resetCandidateUI();
+    setStatus('사진을 선택했습니다. 아래에서 본캐 스타일을 고른 뒤 생성해주세요.');
+  };
+  reader.onerror=()=>setStatus('사진을 읽지 못했습니다. 다른 사진을 선택해주세요.');
+  reader.readAsDataURL(file);
+}
+function installPhotoPicker(){
+  const input=$("photoInput");if(!input)return;
+  input.removeAttribute('capture');
+  input.setAttribute('accept','image/*');
+  const hint=$("photoHint");if(hint)hint.textContent='📷 사진을 선택해주세요';
+  if(!input.dataset.albumFix){
+    input.dataset.albumFix='1';
+    input.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)applyChosenPhoto(f)});
+  }
+  if($("photoPickerActions"))return;
+  const box=input.closest('.photoBox');if(!box)return;
+  const actions=document.createElement('div');actions.id='photoPickerActions';
+  actions.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px';
+  const album=document.createElement('button');album.type='button';album.className='big alt';album.style.marginTop='0';album.textContent='앨범에서 선택';
+  album.onclick=e=>{e.preventDefault();e.stopPropagation();input.value='';input.removeAttribute('capture');input.click()};
+  const camera=document.createElement('button');camera.type='button';camera.className='big alt';camera.style.marginTop='0';camera.textContent='카메라로 촬영';
+  const cameraInput=document.createElement('input');cameraInput.type='file';cameraInput.accept='image/*';cameraInput.setAttribute('capture','user');cameraInput.hidden=true;cameraInput.id='cameraPhotoInput';
+  camera.onclick=e=>{e.preventDefault();e.stopPropagation();cameraInput.value='';cameraInput.click()};
+  cameraInput.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)applyChosenPhoto(f)};
+  actions.append(album,camera,cameraInput);box.insertAdjacentElement('afterend',actions);
+}
 async function fullReset(){
   try{
     if(typeof toast==='function')toast('설정과 서버 기록을 초기화하고 있습니다.');
@@ -87,6 +128,7 @@ function loadVisual17(){
   const s=document.createElement('script');s.src='/visual-runtime-v17.js?v=17';s.async=true;s.dataset.visualV17='1';document.head.appendChild(s);
 }
 function install(){
+  installPhotoPicker();
   if(typeof window.generateCandidates==='function')window.generateCandidates=progressiveGenerate;
   const btn=$("generateBtn");if(btn)btn.onclick=progressiveGenerate;
   window.resetAll=fullReset;loadVisual17();
