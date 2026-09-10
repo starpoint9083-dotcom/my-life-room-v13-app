@@ -6,6 +6,8 @@ const resetRuntime=fs.readFileSync("public/reset-runtime-v16.js","utf8");
 const visualRuntime=fs.readFileSync("public/visual-runtime-v17.js","utf8");
 const roomRuntime=fs.readFileSync("public/room-runtime-v19.js","utf8");
 const poseRuntime=fs.readFileSync("public/pose-runtime-v20.js","utf8");
+const coreRuntime=fs.readFileSync("public/core-runtime-v21.js","utf8");
+const continuityRuntime=fs.readFileSync("public/continuity-runtime-v22.js","utf8");
 const worker=fs.readFileSync("src/index.js","utf8");
 const life=fs.readFileSync("src/life-engine.js","utf8");
 const visual=fs.readFileSync("src/visual-engine.js","utf8");
@@ -29,11 +31,13 @@ for(const t of ["life_profiles","life_daily","clear_messages"]){if(!sql3.include
 for(const key of ["const ACTIONS = [","const HIDDEN_CHANGES=[","const ASSET_MANIFEST ="]){if(!html.includes(key))errors.push(`missing engine ${key}`)}
 for(const key of ["실사용 엔진","맑은 나의 메시지","syncDaily","syncSmoking","syncCondition","riskTick"]){if(!runtime.includes(key))errors.push(`missing runtime feature ${key}`)}
 for(const key of ["progressiveGenerate","fetchOneAvatar","AbortController","85000","/api/avatar/generate-v17","loadVisual17"]){if(!avatarRuntime.includes(key))errors.push(`missing avatar v17 bridge ${key}`)}
-for(const key of ["setupReset","fullReset","stopSaving","/api/life/reset","localStorage.removeItem","caches.keys()","window.resetAll=setupReset","window.__resetLock"]){if(!resetRuntime.includes(key))errors.push(`missing authoritative reset feature ${key}`)}
+for(const key of ["setupReset","fullReset","stopSaving","/api/life/reset","localStorage.removeItem","caches.keys()","window.resetAll=setupReset","window.__resetLock","loadP2Continuity","continuity-runtime-v22.js","p2-continuity"]){if(!resetRuntime.includes(key))errors.push(`missing authoritative reset/continuity feature ${key}`)}
 for(const key of ["cutout","avgCorner","ensureAsset","enhanceAvatar","enhanceRoom","enhancePet","applyVisual","visual17"]){if(!visualRuntime.includes(key))errors.push(`missing premium visual runtime ${key}`)}
 for(const key of ["roomPrompt","petPrompt","avatarPrompt","posePrompt","VISUAL_MODEL","visual-v17/shared/","AVATAR_ASSETS.put","Photorealistic"]){if(!visual.includes(key))errors.push(`missing premium visual server ${key}`)}
 for(const key of ["v19Sun","v19Wind","v19Leaves","moveActor","poseActor","movePet","swayPlant","roomTap","previewLevel","v19Buy","v19Style","navigator.share","roomV19Audit","refreshActual","applyGrowth","오늘 기록 전"]){if(!roomRuntime.includes(key))errors.push(`missing V19 interaction feature ${key}`)}
 for(const key of ["POSES","ensurePose","/api/avatar/pose","/api/avatar/pose/file","poseV20","nextPose","restoreMaster","preload"]){if(!poseRuntime.includes(key))errors.push(`missing V20 pose runtime ${key}`)}
+for(const key of ["p2CoreV21","riskState","maybeNotify","/api/life/summary","/api/risk-profile"]){if(!coreRuntime.includes(key))errors.push(`missing V21 core runtime ${key}`)}
+for(const key of ["p2ContinuityV22","continuity-v22","seedHidden","installRewardGuards","syncOverallResult","hiddenSource","smokePoints","conditionRewarded","timerRewards"]){if(!continuityRuntime.includes(key))errors.push(`missing V22 continuity runtime ${key}`)}
 for(const key of ["resetSetup","resetFull","DELETE FROM clear_messages","DELETE FROM life_daily","DELETE FROM life_profiles","DELETE FROM habit_signals","DELETE FROM app_events","DELETE FROM avatars","DELETE FROM app_state","DELETE FROM device_auth","AVATAR_ASSETS.delete"]){if(!life.includes(key))errors.push(`incomplete server reset ${key}`)}
 if(!life.includes("handleVisualRoute"))errors.push("visual engine is not bridged through life engine");
 if(!worker.includes("crypto.subtle.digest"))errors.push("device token hashing missing");
@@ -46,9 +50,9 @@ for(const f of ["/runtime-v14.js","/avatar-runtime-v15.js","/reset-runtime-v16.j
 for(const mark of ['resetEngine:"v16"','visualEngine:"v17"','roomEngine:"v19"','poseEngine:"v20"'])if(!worker.includes(mark))errors.push(`health marker missing ${mark}`);
 if(manifest.display!=="standalone")errors.push("PWA manifest invalid");
 if(!sw.includes("serviceWorker")&&!sw.includes("fetch"))errors.push("service worker invalid");
-for(const f of ["/avatar-runtime-v15.js","/reset-runtime-v16.js","/visual-runtime-v17.js","/room-runtime-v19.js","/pose-runtime-v20.js"]){if(!sw.includes(f))errors.push(`offline cache missing ${f}`)}
-if(!sw.includes("my-life-room-v20-shell"))errors.push("service worker cache version is not v20");
-for(const f of ["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","src/life-engine.js","src/visual-engine.js","public/runtime-v14.js","public/avatar-runtime-v15.js","public/reset-runtime-v16.js","public/visual-runtime-v17.js","public/room-runtime-v19.js","public/pose-runtime-v20.js","migrations/0003_life_engine.sql"]){if(!fs.existsSync(f))errors.push(`missing deploy file ${f}`)}
+for(const f of ["/avatar-runtime-v15.js","/reset-runtime-v16.js","/visual-runtime-v17.js","/room-runtime-v19.js","/pose-runtime-v20.js","/core-runtime-v21.js","/continuity-runtime-v22.js"]){if(!sw.includes(f))errors.push(`offline cache missing ${f}`)}
+if(!sw.includes("my-life-room-v22-shell"))errors.push("service worker cache version is not v22");
+for(const f of ["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","src/life-engine.js","src/visual-engine.js","public/runtime-v14.js","public/avatar-runtime-v15.js","public/reset-runtime-v16.js","public/visual-runtime-v17.js","public/room-runtime-v19.js","public/pose-runtime-v20.js","public/core-runtime-v21.js","public/continuity-runtime-v22.js","migrations/0003_life_engine.sql"]){if(!fs.existsSync(f))errors.push(`missing deploy file ${f}`)}
 if(wrangler.name!==settings.worker_name)errors.push(`worker name mismatch: ${wrangler.name} != ${settings.worker_name}`);
 if(wrangler.main!=="src/index.js")errors.push("wrangler main entry invalid");
 if(wrangler.ai?.binding!==settings.ai_binding)errors.push("Workers AI binding mismatch");
@@ -57,4 +61,4 @@ if(wrangler.assets?.directory!=="./public")errors.push("static assets directory 
 for(const needle of ["d1\",\"create","r2\",\"bucket\",\"create","d1_databases","r2_buckets","migrations\",\"apply","wrangler.production.jsonc"]){if(!prepare.includes(needle))errors.push(`prepare script missing ${needle}`)}
 for(const needle of ["/api/health","/api/life/reset","scope:\"setup\"","scope:\"full\"","/api/avatar/save","/api/avatar/generate-v17","/api/visual/ensure","r2Deleted","stateAfterSetup.state!==null","profile===null","d?.ai===true","d?.d1===true","d?.r2===true","DEPLOYMENT VERIFIED"]){if(!verify.includes(needle))errors.push(`verify script missing ${needle}`)}
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
-console.log("V20 full-room preflight passed: live data + AI avatar + reset + premium visuals + interactions + pose engine");
+console.log("V22 full-room preflight passed: live data + AI avatar + reset + premium visuals + interactions + pose + daily continuity");
