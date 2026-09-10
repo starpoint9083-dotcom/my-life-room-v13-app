@@ -3,6 +3,7 @@
 const byId=id=>document.getElementById(id);
 const memory=new Map();
 let visualBusy=false,lastSceneKey="",lastAvatarSource="",lastAvatarCutout="",lastPetCutout="";
+let lastAudit=null;
 
 function addStyle(){
   if(byId("visual17Style"))return;
@@ -57,19 +58,50 @@ function alphaAudit(d,w,h){
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=d[(y*w+x)*4+3];if(a>24){opaque++;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}if(x<band||x>=w-band||y<band||y>=h-band){edgeCount++;if(a<24)edgeTransparent++}}
   const total=w*h,boxW=maxX>=minX?maxX-minX+1:0,boxH=maxY>=minY?maxY-minY+1:0;return {opaqueRatio:opaque/total,edgeClear:edgeCount?edgeTransparent/edgeCount:0,boxW,boxH,boxRatio:boxW*boxH/total};
 }
+function colorDistance(d,p,bg){const dr=d[p]-bg[0],dg=d[p+1]-bg[1],db=d[p+2]-bg[2];return Math.sqrt(dr*dr+dg*dg+db*db)}
+function removeUniformBackground(d,w,h,bg,threshold){
+  const hard=clamp(threshold*1.10,30,46),soft=hard+18;
+  for(let i=0;i<w*h;i++){
+    const p=i*4;if(d[p+3]===0)continue;const dist=colorDistance(d,p,bg.mean);
+    if(dist<=hard)d[p+3]=0;
+    else if(dist<soft){const a=Math.round((dist-hard)/(soft-hard)*255);d[p+3]=Math.min(d[p+3],Math.max(0,a))}
+  }
+}
+function keepPrimaryComponent(d,w,h,kind){
+  const count=w*h,labels=new Int32Array(count),q=new Int32Array(count),parts=[];let label=0;
+  const opaque=i=>d[i*4+3]>36;
+  for(let start=0;start<count;start++){
+    if(labels[start]||!opaque(start))continue;label++;let head=0,tail=0,area=0,minX=w,minY=h,maxX=-1,maxY=-1;q[tail++]=start;labels[start]=label;
+    while(head<tail){const i=q[head++],x=i%w,y=(i/w)|0;area++;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+      const ns=[];if(x>0)ns.push(i-1);if(x<w-1)ns.push(i+1);if(y>0)ns.push(i-w);if(y<h-1)ns.push(i+w);
+      for(const n of ns)if(!labels[n]&&opaque(n)){labels[n]=label;q[tail++]=n}
+    }
+    parts.push({label,area,minX,minY,maxX,maxY,height:maxY-minY+1,width:maxX-minX+1});
+  }
+  if(!parts.length)throw new Error("no foreground component");
+  const total=count;
+  for(const p of parts){
+    const cx=(p.minX+p.maxX)/2,centerPenalty=Math.abs(cx-w/2)/(w/2),tallBonus=kind==="avatar"?1+0.55*(p.height/h):1+0.20*(p.height/h),topBonus=kind==="avatar"?1+0.28*(1-p.minY/h):1;
+    p.score=p.area*tallBonus*topBonus*(1-0.20*Math.min(1,centerPenalty));
+  }
+  parts.sort((a,b)=>b.score-a.score);const best=parts[0],secondary=parts.slice(1).filter(p=>p.area/total>.004);let removed=0;
+  for(let i=0;i<count;i++){if(d[i*4+3]===0)continue;if(labels[i]!==best.label){d[i*4+3]=0;removed++}}
+  return {components:parts.length,secondarySignificant:secondary.length,primaryArea:best.area/total,removedRatio:removed/total,primaryBox:[best.minX,best.minY,best.maxX,best.maxY]};
+}
 async function cutout(src,kind="avatar"){
-  if(!src)return null;const key=`safe-cutout:${kind}:${src}`;if(memory.has(key))return memory.get(key);
+  if(!src)return null;const key=`safe-cutout-v2:${kind}:${src}`;if(memory.has(key))return memory.get(key);
   const img=await imageLoad(src),maxW=720,maxH=1080,scale=Math.min(1,maxW/img.naturalWidth,maxH/img.naturalHeight),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
   const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);const frame=ctx.getImageData(0,0,w,h),d=frame.data,bg=borderStats(d,w,h),count=w*h,seen=new Uint8Array(count),q=new Int32Array(count);let head=0,tail=0;
-  // Conservative flood-fill. A faint studio halo is safer than deleting faces, hands, sleeves or fur.
   const base=kind==="pet"?28:30,threshold=clamp(base+bg.sd*.35,24,40),threshold2=threshold*threshold;
   const near=i=>{const p=i*4,dr=d[p]-bg.mean[0],dg=d[p+1]-bg.mean[1],db=d[p+2]-bg.mean[2];return dr*dr+dg*dg+db*db<threshold2};
   const push=i=>{if(i<0||i>=count||seen[i]||!near(i))return;seen[i]=1;q[tail++]=i};
   for(let x=0;x<w;x++){push(x);push((h-1)*w+x)}for(let y=0;y<h;y++){push(y*w);push(y*w+w-1)}
   while(head<tail){const i=q[head++],x=i%w;d[i*4+3]=0;if(x>0)push(i-1);if(x<w-1)push(i+1);if(i>=w)push(i-w);if(i<count-w)push(i+w)}
-  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;if(!seen[i])continue;let touchesSubject=false;for(const n of [i-1,i+1,i-w,i+w])if(!seen[n]){touchesSubject=true;break}if(touchesSubject)d[i*4+3]=Math.min(d[i*4+3],72)}
-  const audit=alphaAudit(d,w,h),minOpaque=kind==="pet"?.025:.055,maxOpaque=kind==="pet"?.62:.56;
-  if(audit.opaqueRatio<minOpaque||audit.opaqueRatio>maxOpaque||audit.edgeClear<.55||audit.boxH<h*.30)throw new Error(`unsafe cutout ${JSON.stringify(audit)}`);
+  removeUniformBackground(d,w,h,bg,threshold);
+  const components=keepPrimaryComponent(d,w,h,kind);
+  const audit=alphaAudit(d,w,h),minOpaque=kind==="pet"?.018:.04,maxOpaque=kind==="pet"?.50:.42;
+  lastAudit={kind,...audit,...components,bgSd:bg.sd};
+  if(audit.opaqueRatio<minOpaque||audit.opaqueRatio>maxOpaque||audit.edgeClear<.82||audit.boxH<h*(kind==="pet"?.22:.42))throw new Error(`unsafe cutout v2 ${JSON.stringify(lastAudit)}`);
   ctx.putImageData(frame,0,0);const out=c.toDataURL("image/png");memory.set(key,out);return out;
 }
 function fit(img,kind="avatar"){
@@ -100,7 +132,7 @@ async function applyVisual(){addStyle();setMood();const room=byId("room");if(roo
 function wrap(name,after){const old=window[name];if(typeof old!=="function"||old.__visual17)return;const fn=function(){const r=old.apply(this,arguments);Promise.resolve(r).finally(()=>after());return r};fn.__visual17=true;window[name]=fn}
 function install(){
   addStyle();wrap("applyHome",()=>setTimeout(applyVisual,0));wrap("applySceneAssets",()=>setTimeout(applyVisual,0));wrap("setTime",()=>setTimeout(applyVisual,0));wrap("setDay",()=>setTimeout(()=>{setMood();applyVisual()},0));wrap("renderPetModes",()=>setTimeout(applyVisual,0));setTimeout(applyVisual,30);
-  window.applyVisualV17=applyVisual;window.visual17Cutout=cutout;window.visual17FitActor=fit;window.visual17RestoreMaster=restoreMasterVisual;window.visual17GetMasterCutout=()=>lastAvatarCutout;window.visual17GetPetCutout=()=>lastPetCutout;
+  window.applyVisualV17=applyVisual;window.visual17Cutout=cutout;window.visual17FitActor=fit;window.visual17RestoreMaster=restoreMasterVisual;window.visual17GetMasterCutout=()=>lastAvatarCutout;window.visual17GetPetCutout=()=>lastPetCutout;window.visual17CutoutAudit=()=>lastAudit;window.visual17SegmentationVersion="v22-clean2";
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
 })();
