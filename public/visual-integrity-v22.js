@@ -15,11 +15,11 @@ function statsBorder(d,w,h){
   return {mean,sd:Math.sqrt(variance)};
 }
 function alphaAudit(d,w,h){
-  let opaque=0,transparent=0,edgeTransparent=0,edgeCount=0,minX=w,minY=h,maxX=-1,maxY=-1;
+  let opaque=0,edgeTransparent=0,edgeCount=0,minX=w,minY=h,maxX=-1,maxY=-1;
   const band=Math.max(2,Math.round(Math.min(w,h)*.025));
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     const a=d[(y*w+x)*4+3];
-    if(a>24){opaque++;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}else transparent++;
+    if(a>24){opaque++;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}
     if(x<band||x>=w-band||y<band||y>=h-band){edgeCount++;if(a<24)edgeTransparent++}
   }
   const total=w*h,opaqueRatio=opaque/total,edgeClear=edgeCount?edgeTransparent/edgeCount:0;
@@ -32,19 +32,21 @@ async function safeCutout(src,kind="avatar"){
   const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);
   const frame=ctx.getImageData(0,0,w,h),d=frame.data,bg=statsBorder(d,w,h),count=w*h;
   const seen=new Uint8Array(count),q=new Int32Array(count);let head=0,tail=0;
-  const base=kind==="pet"?30:34,threshold=clamp(base+bg.sd*.45,26,46),threshold2=threshold*threshold*3;
+  // Conservative threshold: remove only pixels truly close to the studio background.
+  // This intentionally prefers a faint halo over deleting skin, hands, dark sleeves or pet fur.
+  const base=kind==="pet"?28:30,threshold=clamp(base+bg.sd*.35,24,40),threshold2=threshold*threshold;
   const near=i=>{const p=i*4,dr=d[p]-bg.mean[0],dg=d[p+1]-bg.mean[1],db=d[p+2]-bg.mean[2];return dr*dr+dg*dg+db*db<threshold2};
   const push=i=>{if(i<0||i>=count||seen[i]||!near(i))return;seen[i]=1;q[tail++]=i};
   for(let x=0;x<w;x++){push(x);push((h-1)*w+x)}for(let y=0;y<h;y++){push(y*w);push(y*w+w-1)}
   while(head<tail){const i=q[head++],x=i%w;d[i*4+3]=0;if(x>0)push(i-1);if(x<w-1)push(i+1);if(i>=w)push(i-w);if(i<count-w)push(i+w)}
-  // Feather only immediately outside the subject edge; never erode interior pixels.
+  // Feather only removed background pixels immediately touching the subject; never erode subject pixels.
   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
     const i=y*w+x;if(!seen[i])continue;let neighborSubject=false;for(const n of [i-1,i+1,i-w,i+w])if(!seen[n]){neighborSubject=true;break}if(!neighborSubject)continue;
-    const p=i*4;d[p+3]=Math.min(d[p+3],80);
+    d[i*4+3]=Math.min(d[i*4+3],72);
   }
   const audit=alphaAudit(d,w,h);
-  const minOpaque=kind==="pet"?.025:.055,maxOpaque=kind==="pet"?.58:.52,minEdge=.58;
-  if(audit.opaqueRatio<minOpaque||audit.opaqueRatio>maxOpaque||audit.edgeClear<minEdge||audit.boxH<h*.30){throw new Error(`unsafe cutout ${JSON.stringify(audit)}`)}
+  const minOpaque=kind==="pet"?.025:.055,maxOpaque=kind==="pet"?.62:.56,minEdge=.55;
+  if(audit.opaqueRatio<minOpaque||audit.opaqueRatio>maxOpaque||audit.edgeClear<minEdge||audit.boxH<h*.30)throw new Error(`unsafe cutout ${JSON.stringify(audit)}`);
   ctx.putImageData(frame,0,0);const out=c.toDataURL("image/png");cache.set(key,out);return out;
 }
 function fitActor(img,kind="avatar"){
