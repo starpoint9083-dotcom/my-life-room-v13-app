@@ -1,153 +1,29 @@
 const VISUAL_MODEL="@cf/black-forest-labs/flux-2-klein-4b";
 const VISUAL_TIMEOUT_MS=45000;
 const PREFIX="visual-v17/shared/";
-
-function safeChoice(value,allowed,fallback){
-  const s=String(value||"").trim();
-  return allowed.includes(s)?s:fallback;
-}
-function slug(value){
-  return encodeURIComponent(String(value||"").trim().toLowerCase()).replaceAll("%","-");
-}
+const POSES=["window","pet","relax","stretch"];
+function safeChoice(value,allowed,fallback){const s=String(value||"").trim();return allowed.includes(s)?s:fallback}
+function slug(value){return encodeURIComponent(String(value||"").trim().toLowerCase()).replaceAll("%","-")}
 function fileUrl(key){return `/api/visual/file?key=${encodeURIComponent(key)}`}
-async function withTimeout(promise,ms=VISUAL_TIMEOUT_MS){
-  let timer;
-  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Visual AI generation timed out.")),ms)});
-  try{return await Promise.race([promise,timeout])}finally{clearTimeout(timer)}
+async function withTimeout(promise,ms=VISUAL_TIMEOUT_MS){let timer;const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Visual AI generation timed out.")),ms)});try{return await Promise.race([promise,timeout])}finally{clearTimeout(timer)}}
+async function runFlux(ai,{prompt,width,height,inputImage=null,seed=null}){const form=new FormData();form.append("prompt",prompt);if(inputImage)form.append("input_image_0",inputImage,"reference.jpg");form.append("width",String(width));form.append("height",String(height));form.append("guidance","3.8");if(seed!==null)form.append("seed",String(seed));const serialized=new Response(form);const result=await withTimeout(ai.run(VISUAL_MODEL,{multipart:{body:serialized.body,contentType:serialized.headers.get("content-type")}}));if(!result||typeof result.image!=="string"||result.image.length<1000)throw new Error("Workers AI did not return a usable image.");return result.image}
+function b64Bytes(b64){const raw=atob(b64),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
+function roomPrompt(style,level,time){const styleText={warm:"warm modern Korean apartment, premium natural oak, cream fabric, tasteful plants",modern:"refined contemporary Korean apartment, pale stone, oak, linen, clean premium styling",cozy:"warm cozy Korean apartment, soft linen, oak furniture, subtle plants, inviting textures"}[style]||"warm modern Korean apartment, premium natural oak, cream fabric",timeText={morning:"clear golden morning sunlight entering from a large window, fresh calm atmosphere",leave:"bright clean late-morning daylight, tidy ready-for-the-day atmosphere",day:"soft natural daytime light, bright balanced interior",return:"late afternoon golden light, welcoming return-home atmosphere",evening:"warm evening lamps with faint blue hour outside, relaxed premium mood",night:"calm sophisticated night lighting, warm lamps, deep blue city glow outside"}[time]||"soft natural daytime light",levelText={1:"comfortable starter studio living room",2:"upgraded spacious one-bedroom living room",3:"beautiful premium apartment living room",4:"luxurious but believable high-end apartment living room"}[level]||"comfortable starter studio living room";return [`Photorealistic ${levelText}, ${styleText}.`,timeText+".","Designed as a believable lived-in wellness home, not a showroom and not a game illustration.","Camera at human eye level, 28mm interior photography, straight composition, realistic perspective.","Keep a clear open floor area in the center foreground for a standing person and a pet to be composited later.","Sofa in the middle background, small side table, rug, a few healthy plants, subtle books and daily-life objects.","Natural physically plausible shadows, realistic fabric and wood texture, premium editorial interior photography.","No people, no animals, no text, no letters, no logos, no UI, no posters containing words, no surreal objects."].join(" ")}
+function petPrompt(kind,mode){const personality={"집사취급형":"independent confident cat, slightly aloof but charming, composed posture and intelligent gaze","개냥이형":"very affectionate friendly cat, warm eyes, gently leaning forward as if approaching its person","듬직이형":"calm loyal medium-small dog, steady posture, trustworthy gentle expression","댕댕이형":"bright playful small dog, happy open expression, energetic but natural posture"}[mode]||"friendly realistic companion pet with a warm natural expression",animal=kind==="cat"?"domestic companion cat":"domestic companion dog";return [`One ${animal}, ${personality}.`,"Photorealistic premium pet portrait, full body from ears to paws and tail, natural anatomy, individual fur strands, realistic eyes and nose.","Sitting or standing naturally, three-quarter view, friendly home-companion scale.","Isolated on a perfectly plain uniform warm light-gray studio background, strong clean subject separation and soft contact shadow directly under paws only.","No furniture, no toys, no text, no logo, no frame, no cartoon, no illustration, no costume."].join(" ")}
+function avatarPrompt(style,variant){const styleMap={"나답게":"natural, recognizable, understated and warm","더 예쁘게":"subtly more polished and attractive while fully preserving identity and age","더 멋지게":"confident, refined and stylish while fully preserving identity and age","더 귀엽게":"friendlier and softer expression while fully preserving adult identity and age","세련된 현실형":"premium contemporary styling, sophisticated but believable"},variants=["relaxed natural expression, premium smart-casual outfit","gentle approachable expression, refined everyday outfit","calm confident expression, sophisticated contemporary outfit"],v=Math.max(0,Math.min(2,Number(variant)||0));return ["Use input image 0 as the identity reference for the exact same adult person.","Preserve recognizable facial identity, age, skin tone, hair identity and facial proportions. Do not beautify into a different person.",`Direction: ${styleMap[style]||styleMap["나답게"]}; ${variants[v]}.`,"Create a photorealistic full-body lifestyle avatar with realistic skin texture, natural anatomy, physically plausible fabric folds, hands and shoes.","Standing relaxed, front three-quarter view, entire body visible, believable adult proportions.","High-end Korean lifestyle editorial photography look, not anime, not cartoon, not painting, not 3D toy, not fashion mannequin.","Place the person on a perfectly plain uniform warm light-gray studio background with strong clean edge separation and a very small soft contact shadow under the shoes only.","No furniture, no text, no logo, no frame."].join(" ")}
+function posePrompt(pose){const p={window:"standing naturally with torso and gaze gently turned toward a window, calm reflective posture, arms relaxed",pet:"slightly bending and looking down warmly toward a companion pet near the feet, one hand naturally lowered",relax:"comfortable relaxed standing pose with weight shifted naturally to one leg, shoulders loose, gentle expression",stretch:"subtle healthy morning stretch, shoulders opening and arms raised naturally without exaggerated anatomy"}[pose]||"comfortable relaxed standing pose";return ["Use input image 0 as the exact identity and outfit reference for the same adult person.","Keep the same face, age, hairstyle, skin tone, body build and clothing. Do not redesign the person.",`Change only the body pose: ${p}.`,"Photorealistic full-body Korean lifestyle editorial photography, realistic hands and limbs, natural adult anatomy.","Entire body visible from head to shoes, isolated on a perfectly plain uniform warm light-gray studio background with clean subject separation.","No furniture, no animal, no text, no logo, no frame, no cartoon, no illustration."].join(" ")}
+async function serveShared(url,env){if(!env.AVATAR_ASSETS)return new Response("R2 unavailable",{status:503});const key=String(url.searchParams.get("key")||"");if(!key.startsWith(PREFIX)||key.includes(".."))return new Response("Not found",{status:404});const obj=await env.AVATAR_ASSETS.get(key);if(!obj)return new Response("Not found",{status:404});const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);headers.set("cache-control","public, max-age=31536000, immutable");if(!headers.get("content-type"))headers.set("content-type","image/jpeg");return new Response(obj.body,{headers})}
+async function ensureShared(request,env,ensureAuth,json){if(!env.AI||!env.AVATAR_ASSETS)return json({ok:false,error:"AI or R2 binding unavailable"},503);const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const b=await request.json().catch(()=>({})),type=safeChoice(b.type,["room","pet"],"");if(!type)return json({ok:false,error:"Invalid visual type"},400);let key,prompt,width,height,meta;if(type==="room"){const style=safeChoice(b.roomStyle,["warm","modern","cozy"],"warm"),level=Math.max(1,Math.min(4,Math.round(Number(b.level)||1)),time=safeChoice(b.time,["morning","leave","day","return","evening","night"],"morning");key=`${PREFIX}rooms/${style}/lv${level}/${time}.jpg`;prompt=roomPrompt(style,level,time);width=1024;height=768;meta={type,style,level,time}}else{const mode=safeChoice(b.petMode,["집사취급형","개냥이형","듬직이형","댕댕이형"],"댕댕이형"),kind=safeChoice(b.petKind,["cat","dog"],mode==="집사취급형"||mode==="개냥이형"?"cat":"dog");key=`${PREFIX}pets/${slug(mode)}.jpg`;prompt=petPrompt(kind,mode);width=640;height=640;meta={type,kind,mode}}const existing=await env.AVATAR_ASSETS.head(key);if(existing)return json({ok:true,cached:true,key,url:fileUrl(key),meta});const image=await runFlux(env.AI,{prompt,width,height,seed:Math.floor(Math.random()*1000000000)}),bytes=b64Bytes(image);await env.AVATAR_ASSETS.put(key,bytes,{httpMetadata:{contentType:"image/jpeg",cacheControl:"public, max-age=31536000"},customMetadata:{engine:"visual-v17",...Object.fromEntries(Object.entries(meta).map(([k,v])=>[k,String(v)]))}});return json({ok:true,cached:false,key,url:fileUrl(key),bytes:bytes.byteLength,meta})}
+async function avatarV17(request,env,json){if(!env.AI)return json({ok:false,error:"Workers AI binding unavailable"},503);const data=await request.formData(),image=data.get("image");if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"사진 파일이 필요합니다."},400);if(image.size>4000000)return json({ok:false,error:"사진 파일이 너무 큽니다."},413);const style=String(data.get("style")||"나답게"),variant=Math.max(0,Math.min(2,Math.round(Number(data.get("variant"))||0)));try{const out=await runFlux(env.AI,{prompt:avatarPrompt(style,variant),width:640,height:960,inputImage:image,seed:Math.floor(Math.random()*1000000000)+variant*9973});return json({ok:true,engine:"v17",model:VISUAL_MODEL,image:`data:image/jpeg;base64,${out}`,variant})}catch(error){return json({ok:false,error:error?.message||"AI 생성 중 오류가 발생했습니다."},500)}}
+async function ensurePose(request,env,ensureAuth,json){
+ if(!env.AI||!env.AVATAR_ASSETS||!env.DB)return json({ok:false,error:"AI, R2 or D1 unavailable"},503);const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const b=await request.json().catch(()=>({})),pose=safeChoice(b.pose,POSES,"");if(!pose)return json({ok:false,error:"Invalid pose"},400);
+ const row=await env.DB.prepare("SELECT r2_key,style FROM avatars WHERE device_id=?1 ORDER BY id DESC LIMIT 1").bind(auth.deviceId).first();if(!row?.r2_key)return json({ok:false,error:"저장된 본캐가 먼저 필요합니다."},409);
+ const base=row.r2_key.endsWith("master.jpg")?row.r2_key.slice(0,-"master.jpg".length):`${row.r2_key}/`,key=`${base}pose-${pose}.jpg`;
+ const cached=await env.AVATAR_ASSETS.head(key);if(cached)return json({ok:true,cached:true,key,pose});
+ const source=await env.AVATAR_ASSETS.get(row.r2_key);if(!source)return json({ok:false,error:"본캐 원본을 찾지 못했습니다."},404);const input=await source.blob();
+ try{const out=await runFlux(env.AI,{prompt:posePrompt(pose),width:640,height:960,inputImage:input,seed:Math.floor(Math.random()*1000000000)}),bytes=b64Bytes(out);await env.AVATAR_ASSETS.put(key,bytes,{httpMetadata:{contentType:"image/jpeg",cacheControl:"private, max-age=31536000"},customMetadata:{engine:"pose-v20",deviceId:auth.deviceId,pose,source:row.r2_key}});return json({ok:true,cached:false,key,pose,bytes:bytes.byteLength})}catch(error){return json({ok:false,error:error?.message||"포즈 생성 실패"},500)}
 }
-async function runFlux(ai,{prompt,width,height,inputImage=null,seed=null}){
-  const form=new FormData();
-  form.append("prompt",prompt);
-  if(inputImage)form.append("input_image_0",inputImage,"reference.jpg");
-  form.append("width",String(width));form.append("height",String(height));
-  form.append("guidance","3.8");
-  if(seed!==null)form.append("seed",String(seed));
-  const serialized=new Response(form);
-  const result=await withTimeout(ai.run(VISUAL_MODEL,{multipart:{body:serialized.body,contentType:serialized.headers.get("content-type")}}));
-  if(!result||typeof result.image!=="string"||result.image.length<1000)throw new Error("Workers AI did not return a usable image.");
-  return result.image;
+async function servePose(request,env,ensureAuth){
+ if(!env.AVATAR_ASSETS)return new Response("R2 unavailable",{status:503});const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;const url=new URL(request.url),key=String(url.searchParams.get("key")||"");if(!key.startsWith(`avatars/${auth.deviceId}/`)||!key.includes("/pose-")||key.includes(".."))return new Response("Not found",{status:404});const obj=await env.AVATAR_ASSETS.get(key);if(!obj)return new Response("Not found",{status:404});const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("cache-control","private, max-age=31536000");if(!headers.get("content-type"))headers.set("content-type","image/jpeg");return new Response(obj.body,{headers})
 }
-function b64Bytes(b64){
-  const raw=atob(b64);const out=new Uint8Array(raw.length);
-  for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
-  return out;
-}
-function roomPrompt(style,level,time){
-  const styleText={
-    warm:"warm modern Korean apartment, premium natural oak, cream fabric, tasteful plants",
-    modern:"refined contemporary Korean apartment, pale stone, oak, linen, clean premium styling",
-    cozy:"warm cozy Korean apartment, soft linen, oak furniture, subtle plants, inviting textures"
-  }[style]||"warm modern Korean apartment, premium natural oak, cream fabric";
-  const timeText={
-    morning:"clear golden morning sunlight entering from a large window, fresh calm atmosphere",
-    leave:"bright clean late-morning daylight, tidy ready-for-the-day atmosphere",
-    day:"soft natural daytime light, bright balanced interior",
-    return:"late afternoon golden light, welcoming return-home atmosphere",
-    evening:"warm evening lamps with faint blue hour outside, relaxed premium mood",
-    night:"calm sophisticated night lighting, warm lamps, deep blue city glow outside"
-  }[time]||"soft natural daytime light";
-  const levelText={1:"comfortable starter studio living room",2:"upgraded spacious one-bedroom living room",3:"beautiful premium apartment living room",4:"luxurious but believable high-end apartment living room"}[level]||"comfortable starter studio living room";
-  return [
-    `Photorealistic ${levelText}, ${styleText}.`,timeText+".",
-    "Designed as a believable lived-in wellness home, not a showroom and not a game illustration.",
-    "Camera at human eye level, 28mm interior photography, straight composition, realistic perspective.",
-    "Keep a clear open floor area in the center foreground for a standing person and a pet to be composited later.",
-    "Sofa in the middle background, small side table, rug, a few healthy plants, subtle books and daily-life objects.",
-    "Natural physically plausible shadows, realistic fabric and wood texture, premium editorial interior photography.",
-    "No people, no animals, no text, no letters, no logos, no UI, no posters containing words, no surreal objects."
-  ].join(" ");
-}
-function petPrompt(kind,mode){
-  const personality={
-    "집사취급형":"independent confident cat, slightly aloof but charming, composed posture and intelligent gaze",
-    "개냥이형":"very affectionate friendly cat, warm eyes, gently leaning forward as if approaching its person",
-    "듬직이형":"calm loyal medium-small dog, steady posture, trustworthy gentle expression",
-    "댕댕이형":"bright playful small dog, happy open expression, energetic but natural posture"
-  }[mode]||"friendly realistic companion pet with a warm natural expression";
-  const animal=kind==="cat"?"domestic companion cat":"domestic companion dog";
-  return [
-    `One ${animal}, ${personality}.`,
-    "Photorealistic premium pet portrait, full body from ears to paws and tail, natural anatomy, individual fur strands, realistic eyes and nose.",
-    "Sitting or standing naturally, three-quarter view, friendly home-companion scale.",
-    "Isolated on a perfectly plain uniform warm light-gray studio background, strong clean subject separation and soft contact shadow directly under paws only.",
-    "No furniture, no toys, no text, no logo, no frame, no cartoon, no illustration, no costume."
-  ].join(" ");
-}
-function avatarPrompt(style,variant){
-  const styleMap={
-    "나답게":"natural, recognizable, understated and warm",
-    "더 예쁘게":"subtly more polished and attractive while fully preserving identity and age",
-    "더 멋지게":"confident, refined and stylish while fully preserving identity and age",
-    "더 귀엽게":"friendlier and softer expression while fully preserving adult identity and age",
-    "세련된 현실형":"premium contemporary styling, sophisticated but believable"
-  };
-  const variants=[
-    "relaxed natural expression, premium smart-casual outfit",
-    "gentle approachable expression, refined everyday outfit",
-    "calm confident expression, sophisticated contemporary outfit"
-  ];
-  const v=Math.max(0,Math.min(2,Number(variant)||0));
-  return [
-    "Use input image 0 as the identity reference for the exact same adult person.",
-    "Preserve recognizable facial identity, age, skin tone, hair identity and facial proportions. Do not beautify into a different person.",
-    `Direction: ${styleMap[style]||styleMap["나답게"]}; ${variants[v]}.`,
-    "Create a photorealistic full-body lifestyle avatar with realistic skin texture, natural anatomy, physically plausible fabric folds, hands and shoes.",
-    "Standing relaxed, front three-quarter view, entire body visible, believable adult proportions.",
-    "High-end Korean lifestyle editorial photography look, not anime, not cartoon, not painting, not 3D toy, not fashion mannequin.",
-    "Place the person on a perfectly plain uniform warm light-gray studio background with strong clean edge separation and a very small soft contact shadow under the shoes only.",
-    "No furniture, no text, no logo, no frame."
-  ].join(" ");
-}
-async function serveShared(url,env){
-  if(!env.AVATAR_ASSETS)return new Response("R2 unavailable",{status:503});
-  const key=String(url.searchParams.get("key")||"");
-  if(!key.startsWith(PREFIX)||key.includes(".."))return new Response("Not found",{status:404});
-  const obj=await env.AVATAR_ASSETS.get(key);if(!obj)return new Response("Not found",{status:404});
-  const headers=new Headers();
-  obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);headers.set("cache-control","public, max-age=31536000, immutable");
-  if(!headers.get("content-type"))headers.set("content-type","image/jpeg");
-  return new Response(obj.body,{headers});
-}
-async function ensureShared(request,env,ensureAuth,json){
-  if(!env.AI||!env.AVATAR_ASSETS)return json({ok:false,error:"AI or R2 binding unavailable"},503);
-  const auth=await ensureAuth(request,env,true);if(!auth.ok)return auth.response;
-  const b=await request.json().catch(()=>({}));
-  const type=safeChoice(b.type,["room","pet"],"");if(!type)return json({ok:false,error:"Invalid visual type"},400);
-  let key,prompt,width,height,meta;
-  if(type==="room"){
-    const style=safeChoice(b.roomStyle,["warm","modern","cozy"],"warm");
-    const level=Math.max(1,Math.min(4,Math.round(Number(b.level)||1)));
-    const time=safeChoice(b.time,["morning","leave","day","return","evening","night"],"morning");
-    key=`${PREFIX}rooms/${style}/lv${level}/${time}.jpg`;prompt=roomPrompt(style,level,time);width=1024;height=768;meta={type,style,level,time};
-  }else{
-    const mode=safeChoice(b.petMode,["집사취급형","개냥이형","듬직이형","댕댕이형"],"댕댕이형");
-    const kind=safeChoice(b.petKind,["cat","dog"],mode.includes("형")&&(mode==="집사취급형"||mode==="개냥이형")?"cat":"dog");
-    key=`${PREFIX}pets/${slug(mode)}.jpg`;prompt=petPrompt(kind,mode);width=640;height=640;meta={type,kind,mode};
-  }
-  const existing=await env.AVATAR_ASSETS.head(key);
-  if(existing)return json({ok:true,cached:true,key,url:fileUrl(key),meta});
-  const image=await runFlux(env.AI,{prompt,width,height,seed:Math.floor(Math.random()*1000000000)});
-  const bytes=b64Bytes(image);
-  await env.AVATAR_ASSETS.put(key,bytes,{httpMetadata:{contentType:"image/jpeg",cacheControl:"public, max-age=31536000"},customMetadata:{engine:"visual-v17",...Object.fromEntries(Object.entries(meta).map(([k,v])=>[k,String(v)]))}});
-  return json({ok:true,cached:false,key,url:fileUrl(key),bytes:bytes.byteLength,meta});
-}
-async function avatarV17(request,env,json){
-  if(!env.AI)return json({ok:false,error:"Workers AI binding unavailable"},503);
-  const data=await request.formData();const image=data.get("image");
-  if(!(image instanceof Blob)||image.size===0)return json({ok:false,error:"사진 파일이 필요합니다."},400);
-  if(image.size>4000000)return json({ok:false,error:"사진 파일이 너무 큽니다."},413);
-  const style=String(data.get("style")||"나답게"),variant=Math.max(0,Math.min(2,Math.round(Number(data.get("variant"))||0)));
-  try{
-    const out=await runFlux(env.AI,{prompt:avatarPrompt(style,variant),width:640,height:960,inputImage:image,seed:Math.floor(Math.random()*1000000000)+variant*9973});
-    return json({ok:true,engine:"v17",model:VISUAL_MODEL,image:`data:image/jpeg;base64,${out}`,variant});
-  }catch(error){return json({ok:false,error:error?.message||"AI 생성 중 오류가 발생했습니다."},500)}
-}
-
-export async function handleVisualRoute(request,env,ensureAuth,json){
-  const url=new URL(request.url);
-  if(url.pathname==="/api/avatar/generate-v17"&&request.method==="POST")return avatarV17(request,env,json);
-  if(url.pathname==="/api/visual/file"&&request.method==="GET")return serveShared(url,env);
-  if(url.pathname==="/api/visual/ensure"&&request.method==="POST")return ensureShared(request,env,ensureAuth,json);
-  if(url.pathname.startsWith("/api/visual/"))return json({ok:false,error:"Not found"},404);
-  return null;
-}
+export async function handleVisualRoute(request,env,ensureAuth,json){const url=new URL(request.url);if(url.pathname==="/api/avatar/generate-v17"&&request.method==="POST")return avatarV17(request,env,json);if(url.pathname==="/api/avatar/pose"&&request.method==="POST")return ensurePose(request,env,ensureAuth,json);if(url.pathname==="/api/avatar/pose/file"&&request.method==="GET")return servePose(request,env,ensureAuth);if(url.pathname==="/api/visual/file"&&request.method==="GET")return serveShared(url,env);if(url.pathname==="/api/visual/ensure"&&request.method==="POST")return ensureShared(request,env,ensureAuth,json);if(url.pathname.startsWith("/api/visual/"))return json({ok:false,error:"Not found"},404);return null}
