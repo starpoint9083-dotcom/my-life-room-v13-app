@@ -1,0 +1,120 @@
+name: AI Autopilot Upgrade Proposal
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '35 19 * * 0,3'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ai-autopilot-upgrade
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Baseline safety check
+        run: |
+          set -euo pipefail
+          npm audit --omit=dev --audit-level=high
+          npm run check
+          rm -rf .wrangler-ai-baseline
+          npx wrangler deploy --dry-run --outdir .wrangler-ai-baseline
+
+      - name: Check AI key availability
+        id: ai_key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -n "${OPENAI_API_KEY:-}" ]; then echo "available=true" >> "$GITHUB_OUTPUT"; else echo "available=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Avoid duplicate autopilot PRs
+        if: steps.ai_key.outputs.available == 'true'
+        id: queue
+        run: |
+          COUNT="$(gh pr list --state open --limit 100 --json headRefName --jq '[.[] | select(.headRefName | startswith("autopilot/"))] | length')"
+          if [ "$COUNT" -gt 0 ]; then echo "ready=false" >> "$GITHUB_OUTPUT"; else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Ask AI for one guarded low-risk improvement
+        if: steps.ai_key.outputs.available == 'true' && steps.queue.outputs.ready == 'true'
+        id: propose
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-5.6-luna
+        run: node scripts/ai-autopilot.mjs
+
+      - name: Detect and constrain AI changes
+        if: steps.ai_key.outputs.available == 'true' && steps.queue.outputs.ready == 'true'
+        id: changes
+        run: |
+          set -euo pipefail
+          CHANGED="$(git diff --name-only)"
+          if [ -z "$CHANGED" ]; then echo "present=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "$CHANGED"
+          while IFS= read -r file; do
+            case "$file" in
+              public/index.html|public/runtime-v14.js|public/room-runtime-v19.js|public/pose-runtime-v20.js) ;;
+              *) echo "::error::AI modified a non-allowlisted path: $file"; exit 1;;
+            esac
+          done <<< "$CHANGED"
+          git diff --check
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      - name: Ten-pass validation of AI candidate
+        if: steps.changes.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          node --check public/runtime-v14.js
+          node --check public/room-runtime-v19.js
+          node --check public/pose-runtime-v20.js
+          npm audit --omit=dev --audit-level=high
+          for i in $(seq 1 10); do
+            echo "=== AI candidate validation $i/10 ==="
+            npm run check
+            rm -rf .wrangler-ai-dry-run
+            npx wrangler deploy --dry-run --outdir .wrangler-ai-dry-run
+          done
+
+      - name: Create reviewed branch and pull request
+        if: steps.changes.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          SUMMARY="$(cat .autopilot-summary.txt 2>/dev/null || echo 'Low-risk maintenance improvement')"
+          BRANCH="autopilot/upgrade-${GITHUB_RUN_ID}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$BRANCH"
+          git add public/index.html public/runtime-v14.js public/room-runtime-v19.js public/pose-runtime-v20.js
+          git commit -m "autopilot: $SUMMARY"
+          git push origin "$BRANCH"
+          printf 'AI 자동개선 후보입니다.\n\n- 요약: %s\n- 안전장치: 허용된 프런트엔드 파일만 변경\n- 검증: production audit + preflight + Wrangler dry-run 10회 통과\n- 배포: 아직 하지 않음. 병합 후 기존 main 배포 파이프라인이 실제 Cloudflare 배포와 E2E 검증을 수행합니다.\n' "$SUMMARY" > /tmp/pr-body.md
+          gh pr create --base main --head "$BRANCH" --title "Autopilot: $SUMMARY" --body-file /tmp/pr-body.md
+
+      - name: Explain inactive AI layer
+        if: steps.ai_key.outputs.available != 'true'
+        run: echo 'AI autopilot is installed but inactive until repository secret OPENAI_API_KEY is configured. Health guard and Dependabot do not depend on this key.'
+
+      - name: Explain queued AI layer
+        if: steps.ai_key.outputs.available == 'true' && steps.queue.outputs.ready != 'true'
+        run: echo 'An autopilot pull request is already open, so this run safely skipped generating another one.'

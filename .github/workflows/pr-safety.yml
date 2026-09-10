@@ -1,0 +1,60 @@
+name: Pull Request Safety Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-safety-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static syntax and production dependency audit
+        run: |
+          set -euo pipefail
+          node --check src/index.js
+          node --check src/life-engine.js
+          node --check src/visual-engine.js
+          node --check public/runtime-v14.js
+          node --check public/avatar-runtime-v15.js
+          node --check public/reset-runtime-v16.js
+          node --check public/visual-runtime-v17.js
+          node --check public/room-runtime-v19.js
+          node --check public/pose-runtime-v20.js
+          node --check preflight.mjs
+          node --check scripts/prepare-cloudflare.mjs
+          node --check scripts/verify-deployment.mjs
+          node --check scripts/check-live.mjs
+          node --check scripts/ai-autopilot.mjs
+          npm audit --omit=dev --audit-level=high
+
+      - name: Ten-pass preflight and Wrangler dry-run
+        run: |
+          set -euo pipefail
+          git diff --check origin/main...HEAD || true
+          for i in $(seq 1 10); do
+            echo "=== PR validation $i/10 ==="
+            npm run check
+            rm -rf .wrangler-pr-dry-run
+            npx wrangler deploy --dry-run --outdir .wrangler-pr-dry-run
+          done
