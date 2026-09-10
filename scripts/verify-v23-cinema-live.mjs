@@ -9,13 +9,15 @@ let passed=false,last="";
 for(let attempt=1;attempt<=12;attempt++){
  try{
   const health=await fetch(base+"/api/health",{cache:"no-store"}),h=await health.json();
-  const runtime=await text("/cinema-runtime-v23.js"),sw=await text("/sw.js");
+  const runtime=await text("/cinema-runtime-v23.js"),background=await text("/cinema-background-v23.js"),sw=await text("/sw.js");
   const route=await fetch(base+"/api/cinema/status",{cache:"no-store"}),routeBody=await route.text();
-  const ok=health.ok&&h.ok===true&&h.cinemaEngine==="v23-pilot"&&h.cinemaVideoModel==="minimax/hailuo-2.3-fast"&&runtime.r.ok&&runtime.body.includes("combinations:27")&&runtime.body.includes("clipSlots:9")&&runtime.body.includes("URL.createObjectURL")&&sw.r.ok&&sw.body.includes("/cinema-runtime-v23.js")&&sw.body.includes('const CINEMA="pilot1"')&&route.status===401&&routeBody.includes("Device credentials missing");
-  console.log(`${ok?"PASS":"WAIT"} V23 cinema live attempt ${attempt}/12 health=${health.status} runtime=${runtime.r.status} route=${route.status}`);
-  if(ok){passed=true;break}last=JSON.stringify({h,runtime:runtime.body.slice(0,120),sw:sw.body.slice(0,120),route:routeBody.slice(0,120)})
- }catch(e){last=e.message;console.log(`WAIT V23 cinema live attempt ${attempt}/12 ${e.message}`)}
+  const batch=await fetch(base+"/api/cinema/batch/start",{method:"POST",headers:{"content-type":"application/json"},body:"{}",cache:"no-store"}),batchBody=await batch.text();
+  const publicBad=await fetch(base+"/api/cinema/batch/public?id=bad",{cache:"no-store"}),publicBadBody=await publicBad.text();
+  const ok=health.ok&&h.ok===true&&h.cinemaEngine==="v23-pilot"&&h.cinemaVideoModel==="minimax/hailuo-2.3-fast"&&h.cinemaBackground===true&&runtime.r.ok&&runtime.body.includes("combinations:27")&&runtime.body.includes("clipSlots:9")&&runtime.body.includes("URL.createObjectURL")&&background.r.ok&&background.body.includes("myroomCinemaV23BackgroundJob")&&background.body.includes("/api/cinema/batch/start")&&background.body.includes("화면을 닫아도 계속됩니다")&&sw.r.ok&&sw.body.includes("/cinema-runtime-v23.js")&&sw.body.includes("/cinema-background-v23.js")&&sw.body.includes('const CINEMA="pilot-background1"')&&route.status===401&&routeBody.includes("Device credentials missing")&&batch.status===401&&batchBody.includes("Device credentials missing")&&publicBad.status===400&&publicBadBody.includes("Invalid job id");
+  console.log(`${ok?"PASS":"WAIT"} V23 cinema background live attempt ${attempt}/12 health=${health.status} runtime=${runtime.r.status} background=${background.r.status} route=${route.status} batch=${batch.status}`);
+  if(ok){passed=true;break}last=JSON.stringify({h,runtime:runtime.body.slice(0,120),background:background.body.slice(0,120),sw:sw.body.slice(0,160),route:routeBody.slice(0,120),batch:batchBody.slice(0,120),publicBad:publicBadBody.slice(0,120)})
+ }catch(e){last=e.message;console.log(`WAIT V23 cinema background live attempt ${attempt}/12 ${e.message}`)}
  if(attempt<12)await sleep(5000)
 }
-if(!passed){console.error("P2 V23 Cinema Room live verification failed",last);process.exit(1)}
-console.log("DEPLOYMENT VERIFIED P2 V23 CINEMA PILOT: 9 CLIPS -> 27 FLOWS, NO PAID GENERATION TRIGGERED");
+if(!passed){console.error("P2 V23 Cinema Room background live verification failed",last);process.exit(1)}
+console.log("DEPLOYMENT VERIFIED P2 V23 CINEMA BACKGROUND: 9 CLIPS -> 27 FLOWS, WORKFLOW CONNECTED, NO PAID GENERATION TRIGGERED");
