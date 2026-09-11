@@ -9,8 +9,27 @@ const SLOTS=[
 const LATEST_PUBLIC_KEY="__cinema_pilot_latest__";
 const VISUAL_QC_POINTER_KEY="__cinema_visual_qc_latest__";
 const VISUAL_QC_RESULT_KEY="__cinema_visual_qc_result__";
-const VISUAL_QC_MODEL="@cf/moondream/moondream3.1-9B-A2B";
+const VISUAL_QC_MODEL="@cf/google/gemma-4-26b-a4b-it";
 const VISUAL_KEYS=["oneAdult","onePet","anatomyOk","faceNatural","handsNatural","petNatural","roomNatural","lightingNatural","cameraNatural","artifactFree"];
+const VISUAL_QC_SCHEMA={
+  type:"object",
+  additionalProperties:false,
+  properties:{
+    oneAdult:{type:"boolean"},
+    onePet:{type:"boolean"},
+    anatomyOk:{type:"boolean"},
+    faceNatural:{type:"boolean"},
+    handsNatural:{type:"boolean"},
+    petNatural:{type:"boolean"},
+    roomNatural:{type:"boolean"},
+    lightingNatural:{type:"boolean"},
+    cameraNatural:{type:"boolean"},
+    artifactFree:{type:"boolean"},
+    issues:{type:"array",items:{type:"string"},maxItems:5},
+    note:{type:"string"}
+  },
+  required:[...VISUAL_KEYS,"issues","note"]
+};
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const internalJson=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:JSON_HEADERS});
 const safeChoice=(v,allowed,fallback)=>{const s=String(v||"").trim();return allowed.includes(s)?s:fallback};
@@ -115,7 +134,7 @@ function bytesToDataUrl(bytes,type="image/jpeg"){
   return `data:${type};base64,${btoa(out)}`;
 }
 function visualPrompt(slot){
-  return `You are a strict visual quality inspector for a photorealistic lifestyle film still. Slot: ${slot}. Inspect only visible evidence. Exactly one adult person and exactly one companion pet should appear naturally inside one coherent premium home interior. Check duplicated people or animals, face distortion, impossible hands or limbs, broken pet anatomy, cutout/composite appearance, floating objects, inconsistent light or shadows, warped furniture or room geometry, text/logo/UI artifacts, blur or severe generation artifacts, and unnatural camera perspective. If hands are not clearly visible, do not fail hands unless there is a visible defect. Answer with exactly one compact machine-readable line and no prose: QC|oneAdult=Y|onePet=Y|anatomyOk=Y|faceNatural=Y|handsNatural=Y|petNatural=Y|roomNatural=Y|lightingNatural=Y|cameraNatural=Y|artifactFree=Y|issues=none|note=short note. Use only Y or N for the ten checks. Separate multiple issues with commas.`;
+  return `Inspect this photorealistic lifestyle film still for slot ${slot}. Judge only visible evidence. The intended scene has exactly one adult and exactly one companion pet in one coherent premium home interior. Check person count, pet count, anatomy, face, hands, pet anatomy, room geometry, lighting/shadows, camera perspective, and visible generation artifacts. If hands are not clearly visible, mark handsNatural=true unless there is a visible defect. Keep issues short and factual.`;
 }
 function boolToken(v){
   const s=String(v??"").trim().toLowerCase();
@@ -144,6 +163,23 @@ function parseVisualAnswer(answer){
   raw.note=cleanIssue(noteMatch?.[1]);
   return raw;
 }
+function parseStructuredVisualResponse(response){
+  const candidates=[
+    response?.response,
+    response?.choices?.[0]?.message?.parsed,
+    response?.choices?.[0]?.message?.content,
+    response?.answer
+  ];
+  for(const candidate of candidates){
+    if(candidate&&typeof candidate==="object"&&!Array.isArray(candidate))return candidate;
+    const text=String(candidate||"").trim();
+    if(!text)continue;
+    try{return JSON.parse(text)}catch{}
+    const match=text.match(/\{[\s\S]*\}/);
+    if(match){try{return JSON.parse(match[0])}catch{}}
+  }
+  throw new Error("Structured visual QC response was missing or invalid");
+}
 function normalizeVisual(slot,raw){
   const criteria={};
   for(const k of VISUAL_KEYS){
@@ -162,7 +198,7 @@ function unscoredVisual(slot,error,note="Visual QC could not score this frame"){
 }
 function isLegacyUnscored(c){
   const issues=Array.isArray(c?.issues)?c.issues.map(x=>String(x||"")):[];
-  return c?.scored!==true&&(issues.some(x=>/Visual QC model did not return JSON|not machine-readable|could not score/i.test(x))||/could not score/i.test(String(c?.note||"")));
+  return c?.scored!==true&&(issues.some(x=>/Visual QC model did not return JSON|not machine-readable|could not score|Structured visual QC response/i.test(x))||/could not score/i.test(String(c?.note||"")));
 }
 async function latestAvatarForDevice(env,deviceId){
   return await env.DB.prepare("SELECT r2_key FROM avatars WHERE device_id=?1 ORDER BY id DESC LIMIT 1").bind(deviceId).first();
@@ -178,8 +214,22 @@ async function analyzeVisualFrame(env,prefix,slot){
     const obj=await env.AVATAR_ASSETS.get(`${prefix}cinema-v23/pilot/${slot}.jpg`);
     if(!obj)return unscoredVisual(slot,"frame-missing","Cinema frame missing; visual quality was not judged");
     const bytes=new Uint8Array(await obj.arrayBuffer());
-    const response=await env.AI.run(VISUAL_QC_MODEL,{task:"query",image:bytesToDataUrl(bytes,"image/jpeg"),question:visualPrompt(slot),reasoning:false,temperature:0,max_tokens:700,stream:false});
-    return normalizeVisual(slot,parseVisualAnswer(response?.answer||response?.response||""));
+    const response=await env.AI.run(VISUAL_QC_MODEL,{
+      messages:[
+        {role:"system",content:"You are a strict visual quality inspector. Return only the requested structured result."},
+        {role:"user",content:visualPrompt(slot)}
+      ],
+      image:bytesToDataUrl(bytes,"image/jpeg"),
+      response_format:{
+        type:"json_schema",
+        json_schema:{name:"cinema_visual_qc",strict:true,schema:VISUAL_QC_SCHEMA}
+      },
+      chat_template_kwargs:{enable_thinking:false},
+      temperature:0,
+      max_completion_tokens:500,
+      stream:false
+    });
+    return normalizeVisual(slot,parseStructuredVisualResponse(response));
   }catch(error){
     return unscoredVisual(slot,error?.message||"visual-qc-error");
   }
