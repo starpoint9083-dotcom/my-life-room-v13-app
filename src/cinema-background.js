@@ -11,6 +11,7 @@ const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-cont
 const internalJson=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:JSON_HEADERS});
 const safeChoice=(v,allowed,fallback)=>{const s=String(v||"").trim();return allowed.includes(s)?s:fallback};
 const safeJobId=v=>{const s=String(v||"").trim();return /^[A-Za-z0-9_-]{8,100}$/.test(s)?s:null};
+const avatarPrefix=key=>{const s=String(key||"");return s.endsWith("master.jpg")?s.slice(0,-"master.jpg".length):s.replace(/[^/]+$/,"")};
 
 async function runCinemaInternal(env,deviceId,path,{method="GET",body}={}){
   const req=new Request(`https://cinema.internal${path}`,{
@@ -40,22 +41,50 @@ async function saveLatestPointer(env,{id,deviceId,startedAt}){
     .bind(LATEST_PUBLIC_KEY,state).run();
 }
 
-async function latestPublicStatus(env){
-  if(!env.CINEMA_WORKFLOW||!env.DB)return {ok:false,statusCode:503,error:"Cinema progress monitor is not connected"};
+async function latestPointer(env){
+  if(!env.DB)return null;
   const row=await env.DB.prepare("SELECT state_json,updated_at FROM app_state WHERE device_id=?1").bind(LATEST_PUBLIC_KEY).first();
-  if(!row)return {ok:true,status:"idle",ready:0,total:SLOTS.length,complete:false,error:null,updatedAt:null};
+  if(!row)return null;
   let p=null;try{p=JSON.parse(row.state_json)}catch{}
   const id=safeJobId(p?.id),deviceId=String(p?.deviceId||"");
-  if(!id||!deviceId)return {ok:true,status:"idle",ready:0,total:SLOTS.length,complete:false,error:null,updatedAt:row.updated_at||null};
+  if(!id||!deviceId)return null;
+  return {id,deviceId,updatedAt:row.updated_at||null};
+}
+
+async function latestPublicStatus(env){
+  if(!env.CINEMA_WORKFLOW||!env.DB)return {ok:false,statusCode:503,error:"Cinema progress monitor is not connected"};
+  const pointer=await latestPointer(env);
+  if(!pointer)return {ok:true,status:"idle",ready:0,total:SLOTS.length,complete:false,error:null,updatedAt:null};
   try{
-    const instance=await env.CINEMA_WORKFLOW.get(id),details=await instance.status();
+    const instance=await env.CINEMA_WORKFLOW.get(pointer.id),details=await instance.status();
     let ready=0;
-    try{ready=Number((await runCinemaInternal(env,deviceId,"/api/cinema/status")).ready||0)}catch{}
+    try{ready=Number((await runCinemaInternal(env,pointer.deviceId,"/api/cinema/status")).ready||0)}catch{}
     const complete=details.status==="complete"&&ready>=SLOTS.length;
-    return {ok:true,status:details.status,ready,total:SLOTS.length,complete,error:details.error?.message||null,updatedAt:row.updated_at||null};
+    return {ok:true,status:details.status,ready,total:SLOTS.length,complete,error:details.error?.message||null,updatedAt:pointer.updatedAt};
   }catch(error){
-    return {ok:true,status:"unknown",ready:0,total:SLOTS.length,complete:false,error:error?.message||"Cinema job status unavailable",updatedAt:row.updated_at||null};
+    return {ok:true,status:"unknown",ready:0,total:SLOTS.length,complete:false,error:error?.message||"Cinema job status unavailable",updatedAt:pointer.updatedAt};
   }
+}
+
+async function latestTechnicalQuality(env){
+  if(!env.DB||!env.AVATAR_ASSETS)return {ok:false,statusCode:503,error:"Cinema quality monitor is not connected"};
+  const pointer=await latestPointer(env);
+  if(!pointer)return {ok:true,status:"idle",ready:0,total:SLOTS.length,technicalPass:false,technicalScore:0,visualReview:"pending",paidAiTriggered:false,clips:[],updatedAt:null};
+  const avatar=await env.DB.prepare("SELECT r2_key FROM avatars WHERE device_id=?1 ORDER BY id DESC LIMIT 1").bind(pointer.deviceId).first();
+  if(!avatar?.r2_key)return {ok:true,status:"waiting-for-avatar",ready:0,total:SLOTS.length,technicalPass:false,technicalScore:0,visualReview:"pending",paidAiTriggered:false,clips:[],updatedAt:pointer.updatedAt};
+  const prefix=avatarPrefix(avatar.r2_key),clips=[];
+  for(const slot of SLOTS){
+    const [frame,video]=await Promise.all([
+      env.AVATAR_ASSETS.head(`${prefix}cinema-v23/pilot/${slot}.jpg`),
+      env.AVATAR_ASSETS.head(`${prefix}cinema-v23/pilot/${slot}.mp4`)
+    ]);
+    const meta=video?.customMetadata||{},http=video?.httpMetadata||{};
+    const bytes=Number(video?.size||meta.bytes||0),duration=Number(meta.duration||0),contentType=String(http.contentType||"");
+    const technicalOk=Boolean(frame&&video&&bytes>=50000&&bytes<=60000000&&contentType.includes("video")&&duration===6&&meta.role==="cinema-video");
+    clips.push({slot,frame:Boolean(frame),video:Boolean(video),bytes,duration,contentType:contentType||null,model:meta.model||null,technicalOk});
+  }
+  const ready=clips.filter(x=>x.video).length,passed=clips.filter(x=>x.technicalOk).length,technicalScore=Math.round((passed/SLOTS.length)*100);
+  return {ok:true,status:ready===SLOTS.length?"ready":"incomplete",ready,total:SLOTS.length,technicalPass:passed===SLOTS.length,technicalScore,visualReview:"pending",paidAiTriggered:false,clips,updatedAt:pointer.updatedAt};
 }
 
 export class CinemaBatchWorkflow extends WorkflowEntrypoint {
@@ -93,6 +122,14 @@ export async function handleCinemaBackgroundRoute(request,env,ensureAuth,json){
     }catch(error){return json({ok:false,error:error?.message||"Cinema progress unavailable"},500)}
   }
 
+  if(url.pathname==="/api/cinema/batch/quality-public"&&request.method==="GET"){
+    try{
+      const q=await latestTechnicalQuality(env);
+      if(!q.ok)return json({ok:false,error:q.error},q.statusCode||503);
+      return json(q);
+    }catch(error){return json({ok:false,error:error?.message||"Cinema quality manifest unavailable"},500)}
+  }
+
   if(url.pathname==="/api/cinema/batch/public"&&request.method==="GET"){
     if(!env.CINEMA_WORKFLOW)return json({ok:false,error:"Cinema background workflow is not connected"},503);
     const id=safeJobId(url.searchParams.get("id"));
@@ -119,7 +156,7 @@ export async function handleCinemaBackgroundRoute(request,env,ensureAuth,json){
       const id=`cinema-${crypto.randomUUID()}`,startedAt=new Date().toISOString();
       const instance=await env.CINEMA_WORKFLOW.create({id,params,retention:{successRetention:"3 days",errorRetention:"7 days"}});
       await saveLatestPointer(env,{id,deviceId:auth.deviceId,startedAt});
-      return json({ok:true,engine:CINEMA_INFO.version,background:true,id,status:(await instance.status()).status,publicStatus:`/api/cinema/batch/public?id=${encodeURIComponent(id)}`,publicLatest:"/api/cinema/batch/latest-public"});
+      return json({ok:true,engine:CINEMA_INFO.version,background:true,id,status:(await instance.status()).status,publicStatus:`/api/cinema/batch/public?id=${encodeURIComponent(id)}`,publicLatest:"/api/cinema/batch/latest-public",publicQuality:"/api/cinema/batch/quality-public"});
     }catch(error){return json({ok:false,error:error?.message||"Cinema background job could not start"},500)}
   }
 
