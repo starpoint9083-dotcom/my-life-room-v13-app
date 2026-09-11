@@ -1,0 +1,15 @@
+name: Diagnose Cinema Status
+on:
+  push:
+    branches: [diag-cinema-status-20260911]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public Cinema status
+        run: |
+          set -e
+          echo '=== LATEST PUBLIC STATUS ==='
+          curl -sS --fail-with-body 'https://my-life-room-v13-live-0910.starpoint9083.workers.dev/api/cinema/batch/latest-public' | tee /tmp/status.json
+          echo
+          echo '=== DONE ==='
