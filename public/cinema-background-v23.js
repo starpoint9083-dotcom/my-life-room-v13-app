@@ -10,12 +10,18 @@ function saveJob(id){try{id?localStorage.setItem(JOB_KEY,id):localStorage.remove
 function progressEl(){return document.querySelector("#cinema23Setup .cinema23Progress")}
 function generateBtn(){return byId("cinema23Generate")}
 function paint(text,{done=false,error=false}={}){const p=progressEl();if(p)p.textContent=text;const b=generateBtn();if(b){b.disabled=!error;b.textContent=done?"시험영상 9개 준비 완료":error?"서버 생성 다시 시작":"서버에서 생성 중 · 화면 닫아도 됩니다"}}
-function localAvatar(){try{if(typeof selectedAvatar!=="undefined"&&selectedAvatar)return selectedAvatar}catch{}try{const s=JSON.parse(localStorage.getItem("myroomV13")||"{}");if(s?.selectedAvatar)return s.selectedAvatar}catch{}return null}
+function localAvatar(){
+  try{if(typeof selectedAvatar!=="undefined"&&selectedAvatar)return selectedAvatar}catch{}
+  try{if(typeof photoData!=="undefined"&&photoData)return photoData}catch{}
+  try{const s=JSON.parse(localStorage.getItem("myroomV13")||"{}");if(s?.selectedAvatar)return s.selectedAvatar;if(s?.photoData)return s.photoData}catch{}
+  try{for(const sel of [".avatarFull",".avatarAsset",".avatarPhoto img"]){const src=document.querySelector(sel)?.src;if(src&&/^(data:|blob:|https?:)/i.test(src))return src}}catch{}
+  return null
+}
 function credentials(){try{return {id:localStorage.getItem("myroomDeviceId")||"",token:localStorage.getItem("myroomDeviceToken")||""}}catch{return {id:"",token:""}}}
 async function ensureServerAvatar(){
   let probe=null;
   try{const r=await fetch("/api/cinema/status",{headers:auth(),cache:"no-store"});probe=await r.json().catch(()=>({}));if(r.ok&&probe.ok)return true;if(r.status!==409&&!String(probe?.error||"").includes("본캐"))throw new Error(probe?.error||`본캐 확인 실패 (${r.status})`)}catch(e){if(!String(e?.message||"").includes("본캐"))throw e}
-  const dataUrl=localAvatar();if(!dataUrl)throw new Error("현재 선택된 본캐 원본을 휴대폰에서 찾지 못했습니다.");
+  const dataUrl=localAvatar();if(!dataUrl)throw new Error("현재 선택된 본캐 원본이나 원본 사진을 휴대폰에서 찾지 못했습니다.");
   const {id,token}=credentials();if(!id||!token)throw new Error("기기 인증정보를 찾지 못했습니다.");
   const blob=await (await fetch(dataUrl)).blob();
   const fd=new FormData();fd.append("image",blob,"master.jpg");let style="나답게";try{if(typeof charStyle!=="undefined"&&charStyle)style=charStyle}catch{}fd.append("style",style);fd.append("device_id",id);fd.append("device_token",token);
