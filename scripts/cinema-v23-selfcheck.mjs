@@ -8,7 +8,7 @@ const sw=fs.readFileSync("public/sw.js","utf8");
 const wrangler=JSON.parse(fs.readFileSync("wrangler.jsonc","utf8"));
 const errors=[];
 for(const s of ["v23-pilot","minimax/hailuo-2.3-fast","base-morning","base-evening","base-night","state-success","state-steady","state-recovery","action-avatar","action-pet","action-room","confirm_cost!==true","/api/cinema/status","/api/cinema/generate","/api/cinema/file","cinema-v23/pilot/"])if(!server.includes(s))errors.push(`cinema server missing ${s}`);
-for(const s of ["WorkflowEntrypoint","CinemaBatchWorkflow","step.do","generate ${slot}","/api/cinema/batch/start","/api/cinema/batch/status","/api/cinema/batch/public","/api/cinema/batch/latest-public","saveLatestPointer","latestPublicStatus","LATEST_PUBLIC_KEY","confirm_cost!==true","successRetention"] )if(!background.includes(s))errors.push(`cinema background missing ${s}`);
+for(const s of ["WorkflowEntrypoint","CinemaBatchWorkflow","step.do","generate ${slot}","/api/cinema/batch/start","/api/cinema/batch/status","/api/cinema/batch/public","/api/cinema/batch/latest-public","/api/cinema/batch/quality-public","saveLatestPointer","latestPublicStatus","latestTechnicalQuality","technicalScore","visualReview:\"pending\"","paidAiTriggered:false","LATEST_PUBLIC_KEY","confirm_cost!==true","successRetention"] )if(!background.includes(s))errors.push(`cinema background missing ${s}`);
 for(const s of ["handleCinemaRoute","handleCinemaBackgroundRoute","CinemaBatchWorkflow","CINEMA_INFO","/cinema-runtime-v23.js","/cinema-background-v23.js","cinemaBackground:Boolean(env.CINEMA_WORKFLOW)"] )if(!worker.includes(s))errors.push(`worker bridge missing ${s}`);
 for(const s of ["cinema23Stage","cinema23Video","blobUrl","URL.createObjectURL","playOneShot","playAction","BASES=[\"morning\",\"evening\",\"night\"]","STATES=[\"success\",\"steady\",\"recovery\"]","ACTIONS=[\"avatar\",\"pet\",\"room\"]","combinations:27","clipSlots:9","cinemaSetup","confirm_cost:true"] )if(!runtime.includes(s))errors.push(`cinema runtime missing ${s}`);
 for(const s of ["myroomCinemaV23BackgroundJob","/api/cinema/batch/start","/api/cinema/batch/status","화면을 닫아도 계속됩니다","stopImmediatePropagation","confirm_cost:true"] )if(!bgRuntime.includes(s))errors.push(`cinema background client missing ${s}`);
@@ -17,5 +17,7 @@ if(!sw.includes("/cinema-runtime-v23.js")||!sw.includes("/cinema-background-v23.
 const wf=(wrangler.workflows||[]).find(x=>x.binding==="CINEMA_WORKFLOW");if(!wf||wf.class_name!=="CinemaBatchWorkflow"||wf.name!=="my-life-room-cinema-v23")errors.push("wrangler Cinema Workflow binding missing or invalid");
 const slots=(server.match(/"(?:base|state|action)-[a-z]+"/g)||[]).filter((x,i,a)=>a.indexOf(x)===i);if(slots.length!==9)errors.push(`expected 9 unique cinema slots, found ${slots.length}`);
 if(background.includes("deviceId,status")||background.includes("deviceId,ready"))errors.push("public Cinema progress must not expose device id");
+if(/return \{[^}]*deviceId[^}]*technical/.test(background))errors.push("public Cinema quality must not expose device id");
+if(background.includes("quality-public\"&&request.method===\"POST\""))errors.push("public Cinema quality endpoint must be read-only GET");
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
-console.log("CINEMA V23 PUBLIC-PROGRESS SELFCHECK PASSED: durable 9-clip Workflow + privacy-safe completion monitor");
+console.log("CINEMA V23 QUALITY SELFCHECK PASSED: durable 9-clip Workflow + privacy-safe progress + zero-cost technical manifest");
