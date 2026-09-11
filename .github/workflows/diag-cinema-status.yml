@@ -10,6 +10,7 @@ jobs:
         run: |
           set -e
           echo '=== LATEST PUBLIC STATUS ==='
+          echo 'check: 2026-09-12 01:57 KST'
           curl -sS --fail-with-body 'https://my-life-room-v13-live-0910.starpoint9083.workers.dev/api/cinema/batch/latest-public' | tee /tmp/status.json
           echo
           echo '=== DONE ==='
