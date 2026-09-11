@@ -10,6 +10,7 @@ const LATEST_PUBLIC_KEY="__cinema_pilot_latest__";
 const VISUAL_QC_POINTER_KEY="__cinema_visual_qc_latest__";
 const VISUAL_QC_RESULT_KEY="__cinema_visual_qc_result__";
 const VISUAL_QC_MODEL="@cf/moondream/moondream3.1-9B-A2B";
+const VISUAL_KEYS=["oneAdult","onePet","anatomyOk","faceNatural","handsNatural","petNatural","roomNatural","lightingNatural","cameraNatural","artifactFree"];
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const internalJson=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:JSON_HEADERS});
 const safeChoice=(v,allowed,fallback)=>{const s=String(v||"").trim();return allowed.includes(s)?s:fallback};
@@ -114,24 +115,54 @@ function bytesToDataUrl(bytes,type="image/jpeg"){
   return `data:${type};base64,${btoa(out)}`;
 }
 function visualPrompt(slot){
-  return `You are a strict visual quality inspector for a photorealistic lifestyle film still. Slot: ${slot}. Inspect only visible evidence. Exactly one adult person and exactly one companion pet should appear naturally inside one coherent premium home interior. Look for duplicated people or animals, face distortion, impossible hands or limbs, broken pet anatomy, cutout/composite appearance, floating objects, inconsistent light or shadows, warped furniture or room geometry, text/logo/UI artifacts, blur or severe generation artifacts, and unnatural camera perspective. If hands are not clearly visible, do not fail hands unless there is a visible defect. Return ONLY one JSON object with these exact keys: oneAdult, onePet, anatomyOk, faceNatural, handsNatural, petNatural, roomNatural, lightingNatural, cameraNatural, artifactFree (all booleans); issues (array of up to 5 short strings); note (one short string). No markdown and no extra commentary.`;
+  return `You are a strict visual quality inspector for a photorealistic lifestyle film still. Slot: ${slot}. Inspect only visible evidence. Exactly one adult person and exactly one companion pet should appear naturally inside one coherent premium home interior. Check duplicated people or animals, face distortion, impossible hands or limbs, broken pet anatomy, cutout/composite appearance, floating objects, inconsistent light or shadows, warped furniture or room geometry, text/logo/UI artifacts, blur or severe generation artifacts, and unnatural camera perspective. If hands are not clearly visible, do not fail hands unless there is a visible defect. Answer with exactly one compact machine-readable line and no prose: QC|oneAdult=Y|onePet=Y|anatomyOk=Y|faceNatural=Y|handsNatural=Y|petNatural=Y|roomNatural=Y|lightingNatural=Y|cameraNatural=Y|artifactFree=Y|issues=none|note=short note. Use only Y or N for the ten checks. Separate multiple issues with commas.`;
 }
+function boolToken(v){
+  const s=String(v??"").trim().toLowerCase();
+  if(["true","y","yes","1","pass","ok"].includes(s))return true;
+  if(["false","n","no","0","fail","bad"].includes(s))return false;
+  return null;
+}
+function cleanIssue(v){return String(v||"").replace(/[\r\n]+/g," ").trim().slice(0,180)}
 function parseVisualAnswer(answer){
   const text=String(answer||"").trim();
-  const match=text.match(/\{[\s\S]*\}/);
-  if(!match)throw new Error("Visual QC model did not return JSON");
-  return JSON.parse(match[0]);
+  if(!text)throw new Error("Visual QC model returned an empty answer");
+  const jsonMatch=text.match(/\{[\s\S]*\}/);
+  if(jsonMatch){
+    try{return JSON.parse(jsonMatch[0])}catch{}
+  }
+  const raw={};
+  for(const key of VISUAL_KEYS){
+    const m=text.match(new RegExp(`(?:^|[|,;\\s])${key}\\s*[:=]\\s*(true|false|yes|no|y|n|1|0|pass|fail|ok|bad)(?=$|[|,;\\s])`,`i`));
+    if(m){const value=boolToken(m[1]);if(value!==null)raw[key]=value}
+  }
+  if(Object.keys(raw).length!==VISUAL_KEYS.length)throw new Error(`Visual QC response was not machine-readable (${Object.keys(raw).length}/${VISUAL_KEYS.length} checks found)`);
+  const issuesMatch=text.match(/(?:^|\|)issues\s*[:=]\s*([^|]*)/i);
+  const noteMatch=text.match(/(?:^|\|)note\s*[:=]\s*([^|]*)/i);
+  const issueText=cleanIssue(issuesMatch?.[1]);
+  raw.issues=!issueText||/^(none|no issues?|n\/a)$/i.test(issueText)?[]:issueText.split(/\s*,\s*/).map(cleanIssue).filter(Boolean).slice(0,5);
+  raw.note=cleanIssue(noteMatch?.[1]);
+  return raw;
 }
-function bool(v){return v===true||String(v).toLowerCase()==="true"}
-function cleanIssue(v){return String(v||"").replace(/[\r\n]+/g," ").trim().slice(0,180)}
 function normalizeVisual(slot,raw){
-  const keys=["oneAdult","onePet","anatomyOk","faceNatural","handsNatural","petNatural","roomNatural","lightingNatural","cameraNatural","artifactFree"];
-  const criteria={};for(const k of keys)criteria[k]=bool(raw?.[k]);
-  const passed=keys.filter(k=>criteria[k]).length,score=Math.round((passed/keys.length)*100);
+  const criteria={};
+  for(const k of VISUAL_KEYS){
+    const parsed=typeof raw?.[k]==="boolean"?raw[k]:boolToken(raw?.[k]);
+    if(parsed===null)throw new Error(`Visual QC response missing boolean ${k}`);
+    criteria[k]=parsed;
+  }
+  const passed=VISUAL_KEYS.filter(k=>criteria[k]).length,score=Math.round((passed/VISUAL_KEYS.length)*100);
   const severe=!criteria.oneAdult||!criteria.onePet||!criteria.anatomyOk||!criteria.faceNatural||!criteria.petNatural||!criteria.artifactFree;
   const issues=Array.isArray(raw?.issues)?raw.issues.map(cleanIssue).filter(Boolean).slice(0,5):[];
   const note=cleanIssue(raw?.note);
-  return {slot,score,pass:score>=80&&!severe,regenerationCandidate:score<80||severe,criteria,issues,note};
+  return {slot,scored:true,score,pass:score>=80&&!severe,regenerationCandidate:score<80||severe,criteria,issues,note,error:null};
+}
+function unscoredVisual(slot,error,note="Visual QC could not score this frame"){
+  return {slot,scored:false,score:null,pass:false,regenerationCandidate:false,criteria:{},issues:[cleanIssue(error||"visual-qc-error")],note,error:cleanIssue(error||"visual-qc-error")};
+}
+function isLegacyUnscored(c){
+  const issues=Array.isArray(c?.issues)?c.issues.map(x=>String(x||"")):[];
+  return c?.scored!==true&&(issues.some(x=>/Visual QC model did not return JSON|not machine-readable|could not score/i.test(x))||/could not score/i.test(String(c?.note||"")));
 }
 async function latestAvatarForDevice(env,deviceId){
   return await env.DB.prepare("SELECT r2_key FROM avatars WHERE device_id=?1 ORDER BY id DESC LIMIT 1").bind(deviceId).first();
@@ -145,18 +176,28 @@ async function visualFrameReadiness(env,deviceId){
 async function analyzeVisualFrame(env,prefix,slot){
   try{
     const obj=await env.AVATAR_ASSETS.get(`${prefix}cinema-v23/pilot/${slot}.jpg`);
-    if(!obj)return {slot,score:0,pass:false,regenerationCandidate:true,criteria:{},issues:["frame-missing"],note:"Cinema frame missing"};
+    if(!obj)return unscoredVisual(slot,"frame-missing","Cinema frame missing; visual quality was not judged");
     const bytes=new Uint8Array(await obj.arrayBuffer());
-    const response=await env.AI.run(VISUAL_QC_MODEL,{task:"query",image:bytesToDataUrl(bytes,"image/jpeg"),question:visualPrompt(slot),reasoning:false,temperature:0.1,max_tokens:900,stream:false});
+    const response=await env.AI.run(VISUAL_QC_MODEL,{task:"query",image:bytesToDataUrl(bytes,"image/jpeg"),question:visualPrompt(slot),reasoning:false,temperature:0,max_tokens:700,stream:false});
     return normalizeVisual(slot,parseVisualAnswer(response?.answer||response?.response||""));
   }catch(error){
-    return {slot,score:0,pass:false,regenerationCandidate:true,criteria:{},issues:[cleanIssue(error?.message||"visual-qc-error")],note:"Visual QC could not score this frame"};
+    return unscoredVisual(slot,error?.message||"visual-qc-error");
   }
 }
 function visualPublicShape(result){
-  if(!result)return {ok:true,status:"idle",ready:0,total:SLOTS.length,complete:false,paidAiTriggered:false,model:VISUAL_QC_MODEL,visualScore:0,pass:false,candidates:[],clips:[],motionReview:"pending-middle-frame-pass",updatedAt:null};
-  const clips=(result.clips||[]).map(c=>({slot:c.slot,score:Number(c.score||0),pass:c.pass===true,regenerationCandidate:c.regenerationCandidate===true,issues:Array.isArray(c.issues)?c.issues.slice(0,5):[]}));
-  return {ok:true,status:result.status||"unknown",ready:Number(result.ready||clips.length||0),total:SLOTS.length,complete:result.status==="complete",paidAiTriggered:result.paidAiTriggered===true,model:VISUAL_QC_MODEL,visualScore:Number(result.visualScore||0),pass:result.pass===true,candidates:clips.filter(c=>c.regenerationCandidate).map(c=>c.slot),clips,motionReview:"pending-middle-frame-pass",updatedAt:result.updatedAt||null};
+  if(!result)return {ok:true,status:"idle",ready:0,scoredCount:0,total:SLOTS.length,complete:false,paidAiTriggered:false,model:VISUAL_QC_MODEL,visualScore:null,pass:false,candidates:[],clips:[],error:null,motionReview:"pending-middle-frame-pass",updatedAt:null};
+  const clips=(result.clips||[]).map(c=>{
+    const legacyUnscored=isLegacyUnscored(c);
+    const scored=c?.scored===true&&!legacyUnscored;
+    return {slot:c.slot,scored,score:scored&&Number.isFinite(Number(c.score))?Number(c.score):null,pass:scored&&c.pass===true,regenerationCandidate:scored&&c.regenerationCandidate===true,issues:Array.isArray(c.issues)?c.issues.slice(0,5):[],error:scored?null:cleanIssue(c.error||c.issues?.[0]||"")};
+  });
+  const scoredClips=clips.filter(c=>c.scored),scoredCount=scoredClips.length;
+  const visualScore=scoredCount?Math.round(scoredClips.reduce((a,c)=>a+Number(c.score||0),0)/scoredCount):null;
+  const underlyingStatus=String(result.status||"unknown");
+  const scoringError=(underlyingStatus==="complete"||underlyingStatus==="error")&&scoredCount<SLOTS.length;
+  const status=scoringError?"error":underlyingStatus;
+  const error=scoringError?`Visual QC scored ${scoredCount}/${SLOTS.length} frames; unscored frames are not regeneration candidates.`:(result.error||null);
+  return {ok:true,status,ready:Number(result.ready||clips.length||0),scoredCount,total:SLOTS.length,complete:status==="complete"&&scoredCount===SLOTS.length,paidAiTriggered:result.paidAiTriggered===true,model:VISUAL_QC_MODEL,visualScore,pass:status==="complete"&&result.pass===true&&scoredCount===SLOTS.length,candidates:clips.filter(c=>c.regenerationCandidate).map(c=>c.slot),clips,error,motionReview:"pending-middle-frame-pass",updatedAt:result.updatedAt||null};
 }
 async function saveVisualResult(env,result){await writeState(env,VISUAL_QC_RESULT_KEY,{...result,updatedAt:new Date().toISOString()})}
 async function latestVisualPublic(env){
@@ -175,18 +216,21 @@ async function runVisualQcWorkflow(env,deviceId,step){
   const prepared=await visualFrameReadiness(env,deviceId);
   if(prepared.ready!==SLOTS.length||!prepared.prefix)throw new Error(`Visual QC requires 9 Cinema frames; found ${prepared.ready}`);
   const clips=[];
-  await saveVisualResult(env,{status:"running",ready:0,total:SLOTS.length,paidAiTriggered:true,visualScore:0,pass:false,clips});
+  await saveVisualResult(env,{status:"running",ready:0,scoredCount:0,total:SLOTS.length,paidAiTriggered:true,visualScore:null,pass:false,clips,error:null});
   for(const slot of SLOTS){
     const result=await step.do(`visual QC ${slot}`,{retries:{limit:1,delay:"5 seconds"},timeout:"3 minutes"},async()=>analyzeVisualFrame(env,prepared.prefix,slot));
     clips.push(result);
-    const visualScore=Math.round(clips.reduce((a,c)=>a+Number(c.score||0),0)/clips.length);
-    await saveVisualResult(env,{status:"running",ready:clips.length,total:SLOTS.length,paidAiTriggered:true,visualScore,pass:false,clips});
+    const scored=clips.filter(c=>c.scored===true),visualScore=scored.length?Math.round(scored.reduce((a,c)=>a+Number(c.score||0),0)/scored.length):null;
+    await saveVisualResult(env,{status:"running",ready:clips.length,scoredCount:scored.length,total:SLOTS.length,paidAiTriggered:true,visualScore,pass:false,clips,error:null});
   }
-  const visualScore=Math.round(clips.reduce((a,c)=>a+Number(c.score||0),0)/SLOTS.length);
-  const pass=clips.every(c=>c.pass===true)&&visualScore>=85;
-  const final={status:"complete",ready:SLOTS.length,total:SLOTS.length,paidAiTriggered:true,visualScore,pass,clips};
+  const scored=clips.filter(c=>c.scored===true),scoredCount=scored.length;
+  const visualScore=scoredCount?Math.round(scored.reduce((a,c)=>a+Number(c.score||0),0)/scoredCount):null;
+  const fullyScored=scoredCount===SLOTS.length;
+  const pass=fullyScored&&clips.every(c=>c.pass===true)&&Number(visualScore)>=85;
+  const error=fullyScored?null:`Visual QC could not score ${SLOTS.length-scoredCount} of ${SLOTS.length} frames; no unscored frame was marked for regeneration.`;
+  const final={status:fullyScored?"complete":"error",ready:SLOTS.length,scoredCount,total:SLOTS.length,paidAiTriggered:true,visualScore,pass,clips,error};
   await saveVisualResult(env,final);
-  return {ok:true,engine:CINEMA_INFO.version,mode:"visual-qc",model:VISUAL_QC_MODEL,ready:SLOTS.length,total:SLOTS.length,visualScore,pass,candidates:clips.filter(c=>c.regenerationCandidate).map(c=>c.slot),motionReview:"pending-middle-frame-pass"};
+  return {ok:fullyScored,engine:CINEMA_INFO.version,mode:"visual-qc",model:VISUAL_QC_MODEL,status:final.status,ready:SLOTS.length,scoredCount,total:SLOTS.length,visualScore,pass,error,candidates:clips.filter(c=>c.scored&&c.regenerationCandidate).map(c=>c.slot),motionReview:"pending-middle-frame-pass"};
 }
 
 export class CinemaBatchWorkflow extends WorkflowEntrypoint {
@@ -281,7 +325,7 @@ export async function handleCinemaBackgroundRoute(request,env,ensureAuth,json){
       const id=`cinema-qc-${crypto.randomUUID()}`,startedAt=new Date().toISOString();
       const instance=await env.CINEMA_WORKFLOW.create({id,params:{deviceId:auth.deviceId,mode:"visual-qc"},retention:{successRetention:"3 days",errorRetention:"7 days"}});
       await saveVisualPointer(env,{id,deviceId:auth.deviceId,startedAt});
-      await saveVisualResult(env,{status:"queued",ready:0,total:SLOTS.length,paidAiTriggered:true,visualScore:0,pass:false,clips:[]});
+      await saveVisualResult(env,{status:"queued",ready:0,scoredCount:0,total:SLOTS.length,paidAiTriggered:true,visualScore:null,pass:false,clips:[],error:null});
       return json({ok:true,engine:CINEMA_INFO.version,mode:"visual-qc",model:VISUAL_QC_MODEL,id,status:(await instance.status()).status,publicStatus:`/api/cinema/batch/public?id=${encodeURIComponent(id)}`,publicLatest:"/api/cinema/batch/visual-qc/latest-public",autoRegeneration:false});
     }catch(error){return json({ok:false,error:error?.message||"Cinema visual QC could not start"},500)}
   }
