@@ -1,6 +1,6 @@
 const CACHE="my-life-room-v23-shell";
 const BUILD="visualfix1";
-const PATCH="homeguard1";
+const PATCH="cleanup2";
 const CINEMA="pilot-background1";
 const SHELL=["/","/index.html","/manifest.webmanifest","/runtime-v14.js","/avatar-runtime-v15.js","/reset-runtime-v16.js","/visual-runtime-v17.js","/room-runtime-v19.js","/pose-runtime-v20.js","/core-runtime-v21.js","/continuity-runtime-v22.js","/cinema-runtime-v23.js","/cinema-background-v23.js","/cinema-motion-qc-v23.js","/assets/asset_manifest.json"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).catch(()=>{}));self.skipWaiting()});
