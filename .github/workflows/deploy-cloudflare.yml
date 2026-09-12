@@ -41,18 +41,22 @@ jobs:
           node --check public/continuity-runtime-v22.js
           node --check public/cinema-runtime-v23.js
           node --check public/cinema-background-v23.js
+          node --check public/motion-runtime-v26.js
           node --check preflight.mjs
           node --check scripts/prepare-cloudflare.mjs
           node --check scripts/verify-deployment.mjs
           node --check scripts/verify-v22-live.mjs
           node --check scripts/verify-v23-cinema-live.mjs
+          node --check scripts/verify-v26-live.mjs
           node --check scripts/visual-hotfix-selfcheck.mjs
+          node --check scripts/motion-v26-selfcheck.mjs
           node --check scripts/cinema-v23-selfcheck.mjs
+          node --check scripts/room-v25-selfcheck.mjs
           node --check scripts/check-live.mjs
           node --check scripts/ai-autopilot.mjs
           npm audit --omit=dev --audit-level=high
 
-      - name: Ten-pass V13 preflight and Wrangler dry-run
+      - name: Ten-pass P2 V26 preflight and Wrangler dry-run
         run: |
           set -euo pipefail
           for i in $(seq 1 10); do
@@ -84,3 +88,6 @@ jobs:
 
       - name: Verify deployed P2 V23 Cinema Room background workflow
         run: node scripts/verify-v23-cinema-live.mjs
+
+      - name: Verify deployed P2 V26 hybrid visuals and natural motion
+        run: node scripts/verify-v26-live.mjs
