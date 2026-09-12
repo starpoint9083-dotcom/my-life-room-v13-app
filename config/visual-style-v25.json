@@ -1,0 +1,55 @@
+{
+  "version": "v25",
+  "name": "Warm Semi-Real Animation Film",
+  "status": "approved-product-direction",
+  "styleMix": {
+    "realIdentityFeaturesPercent": 35,
+    "animationFilmTreatmentPercent": 65
+  },
+  "identityPolicy": {
+    "sourcePhotoIsIdentityAnchor": true,
+    "candidateCount": 3,
+    "selectedCandidateBecomesMaster": true,
+    "allFutureScenesDeriveFromMaster": true,
+    "doNotRegenerateIdentityFromScratchPerScene": true,
+    "preserve": [
+      "face-shape",
+      "eye-shape",
+      "nose-shape",
+      "hairline-and-hairstyle",
+      "skin-tone-family",
+      "age-cues",
+      "body-build"
+    ]
+  },
+  "artDirection": {
+    "character": "warm semi-realistic hand-painted animation-film character, adult proportions, recognizable facial structure from the source photo, soft simplified skin rendering, natural expressive eyes, restrained stylization",
+    "room": "warm hand-painted cinematic apartment interior with realistic perspective, soft natural textures, cream and oak palette, subtle lived-in details, premium but emotionally warm",
+    "pet": "warm semi-realistic animated companion pet, recognizable species and personality, soft fur rendering, natural anatomy, expressive but not cartoonishly exaggerated",
+    "lighting": "soft cinematic morning/evening light, warm practical lamps, gentle shadows, calm emotional color transitions",
+    "camera": "cinematic eye-level framing with believable depth and composition, not a game UI render"
+  },
+  "negativeDirection": [
+    "photorealistic editorial photography",
+    "hyper-real skin pores",
+    "plastic 3D character",
+    "toy-like proportions",
+    "chibi proportions",
+    "extreme anime eyes",
+    "different person from source",
+    "age drift",
+    "face redesign",
+    "multiple people",
+    "multiple pets",
+    "collage",
+    "text or logo"
+  ],
+  "runtimePolicy": {
+    "legacyPhotorealCinemaOnNormalHome": false,
+    "legacyCinemaAssetsPreserved": true,
+    "legacyCinemaAllowedInDiagnosticsOnly": true,
+    "newPaidGenerationRequiresExplicitUserApproval": true,
+    "automaticPaidRegeneration": false
+  },
+  "productGoal": "The user should feel that the same person, same pet, and same room live together in one warm animated-film world while still recognizing the source person's real identity cues."
+}
