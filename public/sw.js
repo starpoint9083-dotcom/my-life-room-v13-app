@@ -1,4 +1,5 @@
-const CACHE="my-life-room-v25-room-shell";
+const CACHE="my-life-room-v23-shell";
+const ROOM_CACHE="my-life-room-v25-room-shell";
 const BUILD="visualfix1";
 const PATCH="cleanup2";
 const CINEMA="pilot-background1";
