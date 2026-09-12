@@ -4,9 +4,10 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "check": "node preflight.mjs && node scripts/visual-hotfix-selfcheck.mjs && node scripts/cinema-v23-selfcheck.mjs",
+    "check": "node preflight.mjs && node scripts/visual-hotfix-selfcheck.mjs && node scripts/cinema-v23-selfcheck.mjs && node scripts/room-v25-selfcheck.mjs",
     "check:visual": "node scripts/visual-hotfix-selfcheck.mjs",
     "check:cinema": "node scripts/cinema-v23-selfcheck.mjs",
+    "check:room-v25": "node scripts/room-v25-selfcheck.mjs",
     "deploy:prepare": "node scripts/prepare-cloudflare.mjs",
     "deploy:verify": "node scripts/verify-deployment.mjs"
   },
