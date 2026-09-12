@@ -126,7 +126,7 @@ async function analyzeVisualFrame(env,prefix,slot){
   try{
     const obj=await env.AVATAR_ASSETS.get(`${prefix}cinema-v23/pilot/${slot}.jpg`);if(!obj)return unscoredVisual(slot,"frame-missing","Cinema frame missing; visual quality was not judged");
     const bytes=new Uint8Array(await obj.arrayBuffer());
-    const response=await env.AI.run(VISUAL_QC_MODEL,{messages:[{role:"system",content:"You are a strict visual quality inspector. Return only the requested structured result."},{role:"user",content:visualPrompt(slot)}],image:bytesToDataUrl(bytes,"image/jpeg"),response_format:{type:"json_schema",json_schema:{name:"cinema_visual_qc",strict:true,schema:VISUAL_QC_SCHEMA}},chat_template_kwargs:{enable_thinking:false},temperature:0,max_completion_tokens:500,stream:false});
+    const response=await env.AI.run(VISUAL_QC_MODEL,{messages:[{role:"system",content:"You are a strict visual quality inspector. Return only the requested structured result."},{role:"user",content:visualPrompt(slot)}],image:bytesToDataUrl(bytes,"image/jpeg"),response_format:{type:"json_schema",json_schema:VISUAL_QC_SCHEMA},chat_template_kwargs:{enable_thinking:false},temperature:0,max_completion_tokens:500,stream:false});
     return normalizeVisual(slot,parseStructuredResponse(response,"Visual QC"));
   }catch(error){return unscoredVisual(slot,error?.message||"visual-qc-error")}
 }
@@ -164,7 +164,7 @@ function unscoredMotion(slot,error){return {slot,scored:false,score:null,pass:fa
 async function analyzeMotionSheet(env,prefix,slot,captureId){
   try{
     const obj=await env.AVATAR_ASSETS.get(motionSheetKey(prefix,slot));if(!obj)return unscoredMotion(slot,"motion-contact-sheet-missing");if(obj.customMetadata?.captureId!==captureId)return unscoredMotion(slot,"motion-contact-sheet-capture-mismatch");const bytes=new Uint8Array(await obj.arrayBuffer());
-    const response=await env.AI.run(MOTION_QC_MODEL,{messages:[{role:"system",content:"You are a strict temporal visual quality inspector. Return only the requested structured result."},{role:"user",content:motionPrompt(slot)}],image:bytesToDataUrl(bytes,"image/jpeg"),response_format:{type:"json_schema",json_schema:{name:"cinema_motion_qc",strict:true,schema:MOTION_QC_SCHEMA}},chat_template_kwargs:{enable_thinking:false},temperature:0,max_completion_tokens:500,stream:false});
+    const response=await env.AI.run(MOTION_QC_MODEL,{messages:[{role:"system",content:"You are a strict temporal visual quality inspector. Return only the requested structured result."},{role:"user",content:motionPrompt(slot)}],image:bytesToDataUrl(bytes,"image/jpeg"),response_format:{type:"json_schema",json_schema:MOTION_QC_SCHEMA},chat_template_kwargs:{enable_thinking:false},temperature:0,max_completion_tokens:500,stream:false});
     return normalizeMotion(slot,parseStructuredResponse(response,"Motion QC"));
   }catch(error){return unscoredMotion(slot,error?.message||"motion-qc-error")}
 }
