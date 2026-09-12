@@ -1,0 +1,69 @@
+name: Patch visual QC Workers AI schema
+
+on:
+  push:
+    branches:
+      - fix/visual-qc-workers-ai-schema
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/visual-qc-workers-ai-schema
+          fetch-depth: 0
+      - name: Patch Workers AI JSON schema shape and add guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/cinema-background.js')
+          s = p.read_text()
+          replacements = {
+              'response_format:{type:"json_schema",json_schema:{name:"cinema_visual_qc",strict:true,schema:VISUAL_QC_SCHEMA}}':
+              'response_format:{type:"json_schema",json_schema:VISUAL_QC_SCHEMA}',
+              'response_format:{type:"json_schema",json_schema:{name:"cinema_motion_qc",strict:true,schema:MOTION_QC_SCHEMA}}':
+              'response_format:{type:"json_schema",json_schema:MOTION_QC_SCHEMA}',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'expected runtime pattern missing: {old}')
+              s = s.replace(old, new)
+          p.write_text(s)
+
+          q = Path('preflight.mjs')
+          t = q.read_text()
+          marker = 'if(errors.length){console.error(errors.join("\\n"));process.exit(1)}'
+          if marker not in t:
+              raise SystemExit('preflight insertion marker missing')
+          guard = '''if(!cinemaBackground.includes('response_format:{type:"json_schema",json_schema:VISUAL_QC_SCHEMA}'))errors.push("Cinema visual QC must use Workers AI direct json_schema shape");
+          if(!cinemaBackground.includes('response_format:{type:"json_schema",json_schema:MOTION_QC_SCHEMA}'))errors.push("Cinema motion QC must use Workers AI direct json_schema shape");
+          if(cinemaBackground.includes('json_schema:{name:"cinema_visual_qc"')||cinemaBackground.includes('json_schema:{name:"cinema_motion_qc"'))errors.push("OpenAI wrapper-style json_schema must not be used with Workers AI binding");
+          '''
+          if 'Workers AI direct json_schema shape' not in t:
+              t = t.replace(marker, guard + marker)
+          q.write_text(t)
+          PY
+
+          node --check src/cinema-background.js
+          node preflight.mjs
+          grep -F 'json_schema:VISUAL_QC_SCHEMA' src/cinema-background.js
+          grep -F 'json_schema:MOTION_QC_SCHEMA' src/cinema-background.js
+          ! grep -F 'json_schema:{name:"cinema_visual_qc"' src/cinema-background.js
+          ! grep -F 'json_schema:{name:"cinema_motion_qc"' src/cinema-background.js
+          rm .github/workflows/patch-visual-qc-schema.yml
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "p2-safe-patcher"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/cinema-background.js preflight.mjs .github/workflows/patch-visual-qc-schema.yml
+          git commit -m "Fix Workers AI structured QC schema shape"
+          git push origin HEAD:fix/visual-qc-workers-ai-schema
