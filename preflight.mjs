@@ -75,5 +75,8 @@ if(wrangler.assets?.directory!=="./public")errors.push("static assets directory 
 const workflow=(wrangler.workflows||[]).find(x=>x.binding==="CINEMA_WORKFLOW");if(!workflow||workflow.name!=="my-life-room-cinema-v23"||workflow.class_name!=="CinemaBatchWorkflow")errors.push("Cinema Workflow binding invalid");
 for(const needle of ["d1\",\"create","r2\",\"bucket\",\"create","d1_databases","r2_buckets","migrations\",\"apply","wrangler.production.jsonc"]){if(!prepare.includes(needle))errors.push(`prepare script missing ${needle}`)}
 for(const needle of ["/api/health","/api/life/reset","scope:\"setup\"","scope:\"full\"","/api/avatar/save","/api/avatar/generate-v17","/api/visual/ensure","r2Deleted","stateAfterSetup.state!==null","profile===null","d?.ai===true","d?.d1===true","d?.r2===true","DEPLOYMENT VERIFIED"]){if(!verify.includes(needle))errors.push(`verify script missing ${needle}`)}
+if(!cinemaBackground.includes('response_format:{type:"json_schema",json_schema:VISUAL_QC_SCHEMA}'))errors.push("Cinema visual QC must use Workers AI direct json_schema shape");
+if(!cinemaBackground.includes('response_format:{type:"json_schema",json_schema:MOTION_QC_SCHEMA}'))errors.push("Cinema motion QC must use Workers AI direct json_schema shape");
+if(cinemaBackground.includes('json_schema:{name:"cinema_visual_qc"')||cinemaBackground.includes('json_schema:{name:"cinema_motion_qc"'))errors.push("OpenAI wrapper-style json_schema must not be used with Workers AI binding");
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
 console.log("V23 preflight passed: V22 life/visual safety + Cinema durable background Workflow + 9 clips -> 27 flows");
