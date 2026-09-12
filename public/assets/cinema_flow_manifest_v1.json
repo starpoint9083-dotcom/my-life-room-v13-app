@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "baseline": "P2 Cinema Pilot Baseline v1",
+  "locked": true,
+  "clipSlots": [
+    "base-morning",
+    "base-evening",
+    "base-night",
+    "state-success",
+    "state-steady",
+    "state-recovery",
+    "action-avatar",
+    "action-pet",
+    "action-room"
+  ],
+  "axes": {
+    "base": ["morning", "evening", "night"],
+    "state": ["success", "steady", "recovery"],
+    "action": ["avatar", "pet", "room"]
+  },
+  "logicalCombinations": 27,
+  "flows": [
+    {"id":"morning.success.avatar","base":"morning","state":"success","action":"avatar"},
+    {"id":"morning.success.pet","base":"morning","state":"success","action":"pet"},
+    {"id":"morning.success.room","base":"morning","state":"success","action":"room"},
+    {"id":"morning.steady.avatar","base":"morning","state":"steady","action":"avatar"},
+    {"id":"morning.steady.pet","base":"morning","state":"steady","action":"pet"},
+    {"id":"morning.steady.room","base":"morning","state":"steady","action":"room"},
+    {"id":"morning.recovery.avatar","base":"morning","state":"recovery","action":"avatar"},
+    {"id":"morning.recovery.pet","base":"morning","state":"recovery","action":"pet"},
+    {"id":"morning.recovery.room","base":"morning","state":"recovery","action":"room"},
+    {"id":"evening.success.avatar","base":"evening","state":"success","action":"avatar"},
+    {"id":"evening.success.pet","base":"evening","state":"success","action":"pet"},
+    {"id":"evening.success.room","base":"evening","state":"success","action":"room"},
+    {"id":"evening.steady.avatar","base":"evening","state":"steady","action":"avatar"},
+    {"id":"evening.steady.pet","base":"evening","state":"steady","action":"pet"},
+    {"id":"evening.steady.room","base":"evening","state":"steady","action":"room"},
+    {"id":"evening.recovery.avatar","base":"evening","state":"recovery","action":"avatar"},
+    {"id":"evening.recovery.pet","base":"evening","state":"recovery","action":"pet"},
+    {"id":"evening.recovery.room","base":"evening","state":"recovery","action":"room"},
+    {"id":"night.success.avatar","base":"night","state":"success","action":"avatar"},
+    {"id":"night.success.pet","base":"night","state":"success","action":"pet"},
+    {"id":"night.success.room","base":"night","state":"success","action":"room"},
+    {"id":"night.steady.avatar","base":"night","state":"steady","action":"avatar"},
+    {"id":"night.steady.pet","base":"night","state":"steady","action":"pet"},
+    {"id":"night.steady.room","base":"night","state":"steady","action":"room"},
+    {"id":"night.recovery.avatar","base":"night","state":"recovery","action":"avatar"},
+    {"id":"night.recovery.pet","base":"night","state":"recovery","action":"pet"},
+    {"id":"night.recovery.room","base":"night","state":"recovery","action":"room"}
+  ],
+  "runtimePolicy": {
+    "reuseExistingNineClips": true,
+    "autoRegeneration": false,
+    "paidGenerationOnRuntime": false,
+    "p2OwnsPlayback": true,
+    "p3ReadOnlySupervisor": true
+  },
+  "qcBaseline": {
+    "technical": "pass",
+    "visual": "pass",
+    "motion": "pass"
+  }
+}
