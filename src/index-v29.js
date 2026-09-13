@@ -16,14 +16,17 @@ async function ensureAuth(request,env,allowCreate=true){
  else if(row.token_hash!==tokenHash)return {ok:false,response:json({ok:false,error:"Invalid device credentials"},403)};
  await env.DB.prepare("UPDATE device_auth SET last_seen_at=datetime('now') WHERE device_id=?1").bind(deviceId).run();return {ok:true,deviceId}
 }
+async function injectSceneManager(request,response){
+ if(request.method!=="GET"||!response?.ok)return response;const type=response.headers.get("content-type")||"";if(!type.includes("text/html"))return response;
+ const html=await response.text();if(html.includes("/scene-manager-v29.js"))return new Response(html,response);
+ const tag='<script src="/scene-manager-v29.js?v=29" defer></script>',body=html.includes("</body>")?html.replace("</body>",tag+"</body>"):html+tag,headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");return new Response(body,{status:response.status,statusText:response.statusText,headers})
+}
 
 export default {
  async fetch(request,env,ctx){
    const url=new URL(request.url);
    if(url.pathname==="/api/scene-library/info"&&request.method==="GET")return json({ok:true,...SCENE_LIBRARY_INFO,d1:Boolean(env.DB),r2:Boolean(env.AVATAR_ASSETS)});
-   if(url.pathname.startsWith("/api/scene-library/")){
-     const scene=await handleSceneLibraryRoute(request,env,ensureAuth,json);if(scene)return scene;
-   }
-   return baseApp.fetch(request,env,ctx);
+   if(url.pathname.startsWith("/api/scene-library/")){const scene=await handleSceneLibraryRoute(request,env,ensureAuth,json);if(scene)return scene}
+   const response=await baseApp.fetch(request,env,ctx);return injectSceneManager(request,response)
  }
 };
