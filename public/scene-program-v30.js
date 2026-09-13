@@ -1,12 +1,13 @@
 (()=>{
 "use strict";
 const VERSION="v30-smart-program";
-const MASTER_ENGINE="/master-motion-v32.js?v=32";
+const MASTER_ENGINE="/master-motion-v33.js?v=33";
+const MASTER_ENGINE_V32="/master-motion-v32.js?v=32"; // compatibility fallback/selfcheck marker
 const RECENT_MAX=8;
 let token=0,running=false,lastMode="",recent=[],masterRequested=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function scene(){return window.sceneV28||null}
-function master(){return window.masterMotionV32||null}
+function master(){return window.masterMotionV33||window.masterMotionV32||null}
 function safeGlobal(name,fallback=""){try{return window[name]??eval(name)??fallback}catch{return fallback}}
 function appTime(){return String(safeGlobal("currentTime","evening")||"evening")}
 function dayResult(){return String(safeGlobal("day","")||"")}
@@ -45,10 +46,11 @@ function mapTime(t){const x=String(t||appTime());if(x==="morning")return "mornin
 function playCurrent(t){return playMode(mapTime(t))}
 function playRisk(){return playMode("risk",{force:true})}
 function stop(){token++;running=false;master()?.stop?.();scene()?.stop?.()}
-function loadMaster(){if(master()||masterRequested||document.querySelector('script[data-master-motion-v32]'))return;masterRequested=true;const s=document.createElement("script");s.src=MASTER_ENGINE;s.async=true;s.dataset.masterMotionV32="1";document.head.appendChild(s)}
+function loadMaster(){if(master()||masterRequested||document.querySelector('script[data-master-motion-v33]'))return;masterRequested=true;const s=document.createElement("script");s.src=MASTER_ENGINE;s.async=true;s.dataset.masterMotionV33="1";s.onerror=()=>{if(window.masterMotionV32)return;const f=document.createElement("script");f.src=MASTER_ENGINE_V32;f.async=true;f.dataset.masterMotionV32="1";document.head.appendChild(f)};document.head.appendChild(s)}
 async function boot(){loadMaster();if(!scene()&&!master())return;window.sceneProgramV30={version:VERSION,status,playMode,playCurrent,playRisk,stop,refresh:()=>({ok:true,readyScenes:ready().length,master:master()?.status?.()||null})};window.dispatchEvent(new CustomEvent("p2:scene-v30-ready",{detail:status()}))}
 window.addEventListener("p2:scene-v28-ready",()=>setTimeout(boot,60),{once:true});
-window.addEventListener("p2:master-motion-v32-ready",()=>{if(!window.sceneProgramV30)setTimeout(boot,20)},{once:true});
+window.addEventListener("p2:master-motion-v33-ready",()=>{if(!window.sceneProgramV30)setTimeout(boot,20)},{once:true});
+window.addEventListener("p2:master-motion-v32-ready",()=>{if(!window.sceneProgramV30)setTimeout(boot,30)},{once:true});
 if(window.sceneV28)setTimeout(boot,80);else setTimeout(()=>{loadMaster();boot()},120);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)stop()});
 })();
