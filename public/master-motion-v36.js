@@ -2,6 +2,7 @@
 "use strict";
 const VERSION="v36-motion-polish";
 const V35_URL="/master-motion-v35.js?v=35";
+const QC_URL="/motion-qc-v37.js?v=37";
 const FULL_BODY=new Set(["master_04_return_home","master_05_sit_down","master_06_walk_to_window"]);
 const ROUTES=new Set(["entry>sofa","sofa>window","window>sofa","sofa>pet","pet>sofa"]);
 const SETTLE={micro:260,full:360,transition:220,returnGap:320,modeGap:300};
@@ -9,6 +10,7 @@ let v35Requested=false,seq=0,current="",currentSlot="",lastMaster="",repeatCount
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function v35(){return window.masterMotionV35||null}
 function requestV35(){if(v35()||v35Requested||document.querySelector('script[data-master-motion-v35]'))return;v35Requested=true;const s=document.createElement("script");s.src=V35_URL;s.async=true;s.dataset.masterMotionV35="1";document.head.appendChild(s)}
+function requestQc(){if(!new URLSearchParams(location.search).has("motionQC")||document.querySelector('script[data-motion-qc-v37]'))return;const s=document.createElement("script");s.src=QC_URL;s.async=true;s.dataset.motionQcV37="1";document.head.appendChild(s)}
 async function waitV35(){requestV35();for(let n=0;n<40&&!v35();n++)await sleep(50);return v35()}
 function norm(x){return x==="pet"?"sofa":String(x||"home")}
 function currentState(){const s=v35()?.status?.()||{};return {location:norm(s.logicalLocation),pose:String(s.logicalPose||"standing")}}
@@ -37,7 +39,7 @@ function continuityReport(){return v35()?.continuityReport?.()||{total:0,counts:
 function qc(){const r=continuityReport();return {version:VERSION,total:r.total||0,counts:r.counts||{},roughSlots:r.roughSlots||[],repeatMaster:lastMaster,repeatCount,routePairs:[...ROUTES],settleMs:{...SETTLE},freeOnly:true,paidGeneration:false}}
 function stop(){seq++;v35()?.stop?.();current="";currentSlot=""}
 function status(){const s=v35()?.status?.()||{};return {version:VERSION,current,currentSlot,lastMode,lastMaster,repeatCount,logicalLocation:norm(s.logicalLocation),logicalPose:s.logicalPose||"standing",mappedSlots:s.mappedSlots||0,roughSlotCount:s.roughSlotCount||0,settleMs:{...SETTLE},freeOnly:true,paidGeneration:false,delegatesTo:"v35-continuity-qc"}}
-async function boot(){requestV35();const e=await waitV35();if(!e)return;window.masterMotionV36={version:VERSION,status,qc,continuityReport,qualityForSlot,naturalScore,normalizeLocation:norm,canRoute,cadenceFor,canPlaySlot,mappedMaster,playMaster,playForSlot,playTransition,playForMode,playAllMasters,stop};window.dispatchEvent(new CustomEvent("p2:master-motion-v36-ready",{detail:status()}))}
+async function boot(){requestV35();const e=await waitV35();if(!e)return;window.masterMotionV36={version:VERSION,status,qc,continuityReport,qualityForSlot,naturalScore,normalizeLocation:norm,canRoute,cadenceFor,canPlaySlot,mappedMaster,playMaster,playForSlot,playTransition,playForMode,playAllMasters,stop};window.dispatchEvent(new CustomEvent("p2:master-motion-v36-ready",{detail:status()}));requestQc()}
 window.addEventListener("beforeunload",()=>stop());
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1160),{once:true});else setTimeout(boot,1160);
 })();
