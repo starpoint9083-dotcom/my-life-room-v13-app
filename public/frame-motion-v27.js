@@ -11,9 +11,7 @@ const cache=new Map();
 
 function room(){return byId("room")}
 function baseAvatar(){return byId("avatarFull")}
-function baseAvatarWrap(){return byId("avatar")}
 function basePet(){return byId("petFull")||document.querySelector("#pet img")}
-function basePetWrap(){return byId("pet")}
 function prefersReduced(){return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches}
 
 function addStyle(){
@@ -49,7 +47,7 @@ function frameDelay(spec,index){
  if(timing?.length)return clamp(Number(timing[index%timing.length])||100,45,1200);
  const fps=clamp(Number(spec?.fps)||8,1,15);return Math.round(1000/fps)
 }
-function normalizePath(src){return String(src||"").startsWith("/")?src:`/${String(src||"").replace(/^\/+/,"")}`}
+function normalizePath(src){return String(src||"").startsWith("/")?String(src):`/${String(src||"").replace(/^\/+/,"")}`}
 
 async function preloadOne(src){
  src=normalizePath(src);if(cache.has(src))return cache.get(src);
@@ -102,18 +100,19 @@ function enqueue(fn){const run=queue.then(fn,fn);queue=run.catch(()=>{});return 
 async function play(name,opts={}){return enqueue(()=>playFrames(name,opts))}
 function stop(){cancelSeq++;running=false;currentAction=""}
 
-async function playWalkTo(targetX=60){
+async function playWalkToDirect(targetX=60){
  const dir=targetX>=positionX?1:-1,dist=Math.abs(targetX-positionX),spec=actionSpec("walk_loop");
  await playFrames("walk_start");
- if(spec&&dist>1){const loops=Math.max(1,Math.round(dist/Math.max(1,Math.abs(Number(spec.stepPct)||3))));const original=positionX;
-   for(let n=0;n<loops;n++){const remain=targetX-positionX,step=Math.abs(remain)<Math.abs(Number(spec.stepPct)||3)?remain:dir*Math.abs(Number(spec.stepPct)||3);spec.startX=positionX;spec.movePct=step;await playFrames("walk_loop",{loopOverride:false});}
-   setPosition(targetX);spec.startX=original;
+ if(spec&&dist>1){const stepSize=Math.max(1,Math.abs(Number(spec.stepPct)||3)),loops=Math.max(1,Math.round(dist/stepSize)),savedStart=spec.startX,savedMove=spec.movePct;
+   for(let n=0;n<loops;n++){const remain=targetX-positionX,step=Math.abs(remain)<stepSize?remain:dir*stepSize;spec.startX=positionX;spec.movePct=step;await playFrames("walk_loop",{loopOverride:false});}
+   setPosition(targetX);spec.startX=savedStart;spec.movePct=savedMove;
  }
  await playFrames("walk_stop");return true
 }
-async function sitSequence(){return enqueue(async()=>{await playWalkTo(Number(manifest?.anchors?.sofaX)||58);return playFrames("sit_down")})}
-async function standSequence(){return enqueue(async()=>{const ok=await playFrames("stand_up");return ok})}
-async function petSequence(){return enqueue(async()=>{const x=Number(manifest?.anchors?.petX)||30;if(Math.abs(positionX-x)>8)await playWalkTo(x+8);return playFrames("pet_touch")})}
+async function playWalkTo(targetX=60){return enqueue(()=>playWalkToDirect(targetX))}
+async function sitSequence(){return enqueue(async()=>{await playWalkToDirect(Number(manifest?.anchors?.sofaX)||58);return playFrames("sit_down")})}
+async function standSequence(){return enqueue(()=>playFrames("stand_up"))}
+async function petSequence(){return enqueue(async()=>{const x=Number(manifest?.anchors?.petX)||30;if(Math.abs(positionX-x)>8)await playWalkToDirect(x+8);return playFrames("pet_touch")})}
 async function idle(){const name=seated&&actionSpec("sit_idle")?"sit_idle":"idle";return play(name,{loopOverride:true,maxLoops:1})}
 
 async function loadManifest(){
@@ -128,13 +127,13 @@ function wireApp(){
 }
 
 async function boot(){
- addStyle();ensureLayers();copyFallbackImages();setPosition(Number(manifest?.anchors?.homeX)||52);
+ addStyle();ensureLayers();copyFallbackImages();
  const ok=await loadManifest();if(!ok){setReady(false);return}
  setPosition(Number(manifest?.anchors?.homeX)||52);
  const first=available("idle")||available("walk_loop")||available("sit_down");setReady(first);
  wireApp();preloadNext(["idle","walk_start","walk_loop","walk_stop","sit_down","sit_idle","stand_up","pet_touch"]);
+ window.frameMotionV27={version:VERSION,ready:()=>ready,manifest:()=>manifest,available,play,playWalkTo,sit:sitSequence,stand:standSequence,pet:petSequence,idle,stop,position:()=>positionX,state:()=>({action:currentAction,running,seated,positionX})};
  if(first&&!prefersReduced())idle();
- window.frameMotionV27={version:VERSION,ready:()=>ready,manifest:()=>manifest,available,play,playWalkTo,sit:sitSequence,stand:standSequence,pet:petSequence,idle,stop,position:()=>positionX,state:()=>({action:currentAction,running,seated,positionX})}
 }
 
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,900),{once:true});else setTimeout(boot,900);
