@@ -1,0 +1,89 @@
+{
+  "version": "v27-free-frame-motion",
+  "styleBlend": "30-real-70-animation",
+  "paidVideo": false,
+  "anchors": {
+    "homeX": 52,
+    "sofaX": 58,
+    "petX": 24,
+    "windowX": 72
+  },
+  "actions": {
+    "idle": {
+      "ready": false,
+      "fps": 3,
+      "loop": true,
+      "actorFrames": [],
+      "petFrames": [],
+      "preload": ["walk_start", "sit_down"]
+    },
+    "walk_start": {
+      "ready": false,
+      "fps": 9,
+      "loop": false,
+      "actorFrames": [],
+      "preload": ["walk_loop"]
+    },
+    "walk_loop": {
+      "ready": false,
+      "fps": 9,
+      "loop": true,
+      "stepPct": 3,
+      "actorFrames": [],
+      "preload": ["walk_stop"]
+    },
+    "walk_stop": {
+      "ready": false,
+      "fps": 9,
+      "loop": false,
+      "actorFrames": [],
+      "preload": ["sit_down", "idle"]
+    },
+    "sit_down": {
+      "ready": false,
+      "fps": 11,
+      "loop": false,
+      "seated": true,
+      "actorFrames": [],
+      "preload": ["sit_idle", "stand_up"]
+    },
+    "sit_idle": {
+      "ready": false,
+      "fps": 3,
+      "loop": true,
+      "seated": true,
+      "actorFrames": [],
+      "preload": ["stand_up"]
+    },
+    "stand_up": {
+      "ready": false,
+      "fps": 11,
+      "loop": false,
+      "seated": false,
+      "actorFrames": [],
+      "preload": ["walk_start", "idle"]
+    },
+    "pet_touch": {
+      "ready": false,
+      "fps": 9,
+      "loop": false,
+      "actorFrames": [],
+      "petFrames": [],
+      "preload": ["idle"]
+    },
+    "look": {
+      "ready": false,
+      "fps": 7,
+      "loop": false,
+      "actorFrames": [],
+      "preload": ["idle"]
+    },
+    "stretch": {
+      "ready": false,
+      "fps": 9,
+      "loop": false,
+      "actorFrames": [],
+      "preload": ["idle"]
+    }
+  }
+}
