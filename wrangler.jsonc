@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "my-life-room-v13-live-0910",
-  "main": "src/index.js",
+  "main": "src/index-v29.js",
   "compatibility_date": "2026-09-10",
   "ai": { "binding": "AI" },
   "workflows": [

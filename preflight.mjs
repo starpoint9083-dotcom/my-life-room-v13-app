@@ -13,6 +13,7 @@ const cinemaRuntime=read("public/cinema-runtime-v23.js");
 const cinemaBackgroundClient=read("public/cinema-background-v23.js");
 const motionRuntime=read("public/motion-runtime-v26.js");
 const worker=read("src/index.js");
+const workerV29=read("src/index-v29.js");
 const life=read("src/life-engine.js");
 const visual=read("src/visual-engine.js");
 const cinema=read("src/cinema-engine.js");
@@ -20,6 +21,7 @@ const cinemaBackground=read("src/cinema-background.js");
 const sql1=read("migrations/0001_init.sql");
 const sql2=read("migrations/0002_auth_and_risk.sql");
 const sql3=read("migrations/0003_life_engine.sql");
+const sql4=read("migrations/0004_scene_library.sql");
 const manifest=JSON.parse(read("public/manifest.webmanifest"));
 const sw=read("public/sw.js");
 const wrangler=JSON.parse(read("wrangler.jsonc"));
@@ -31,6 +33,7 @@ const need=(text,items,label)=>{for(const item of items)if(!text.includes(item))
 
 for(const fn of ["finishSetup","applyHome","setTime","setDay","openMorning","openAlcohol","openSmoking","generateCandidates","saveState","checkServerSync","pushServerState","loadServerState","applySceneAssets","fetchRiskProfile","recordHabitSignal","setupPWAInstall","resetAll","avatarTap","petTap","plantTap","previewLevel"]){if(!html.includes(`function ${fn}(`)&&!html.includes(`async function ${fn}(`))errors.push(`missing function ${fn}`)}
 need(worker,["/api/health","/api/avatar/generate","/api/avatar/save","/api/state","/api/event","/api/signal","/api/risk-profile","crypto.subtle.digest","env.DB","env.AVATAR_ASSETS","handleLifeRoute","handleCinemaBackgroundRoute","CinemaBatchWorkflow","AI_TIMEOUT_MS"],"worker");
+need(workerV29,["handleSceneLibraryRoute","/api/scene-library/info","scene-manager-v29.js?v=29","injectSceneManager"],"V29 worker wrapper");
 need(life,["/api/life/summary","/api/life/profile","/api/life/daily","/api/life/smoking","/api/life/condition","/api/life/message","/api/life/reset","handleVisualRoute","resetSetup","resetFull","DELETE FROM clear_messages","DELETE FROM life_daily","DELETE FROM life_profiles","DELETE FROM habit_signals","DELETE FROM app_events","DELETE FROM avatars","DELETE FROM app_state","DELETE FROM device_auth","AVATAR_ASSETS.delete"],"life");
 need(visual,["VISUAL_VERSION=\"v26-hybrid3070\"","MOTION_VERSION=\"v26-natural-motion\"","visual-v26/hybrid3070/","HYBRID_RULE","30-real-70-animation","/api/avatar/generate-v17","/api/avatar/hybrid-current","/api/avatar/hybrid/file","/api/avatar/pose","/api/avatar/pose/file","/api/visual/file","/api/visual/ensure","/api/motion/status","/api/motion/generate","/api/motion/file","minimax/hailuo-2.3-fast","walk-sit","stand-walk","pet-touch","window-look","No foot sliding","confirm_cost!==true","AVATAR_ASSETS.put"],"V26 visual/motion server");
 if(visual.includes('PREFIX="visual-v17/shared/"'))errors.push("legacy visual-v17 cache prefix returned");
@@ -53,12 +56,13 @@ need(cinemaBackgroundClient,["myroomCinemaV23BackgroundJob","/api/cinema/batch/s
 for(const t of ["app_state","app_events","avatars"])if(!sql1.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`);
 for(const t of ["device_auth","habit_signals"])if(!sql2.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`);
 for(const t of ["life_profiles","life_daily","clear_messages"])if(!sql3.includes(`CREATE TABLE IF NOT EXISTS ${t}`))errors.push(`missing table ${t}`);
+if(!sql4.includes("CREATE TABLE IF NOT EXISTS scene_assets"))errors.push("missing table scene_assets");
 if(manifest.display!=="standalone")errors.push("PWA manifest invalid");
 need(sw,["my-life-room-v26-shell","hybrid-30-real-70-animation-v26","v26-natural-motion","/motion-runtime-v26.js","/avatar-runtime-v15.js","/visual-runtime-v17.js","/room-experience-v25.js"],"service worker V26 cache");
-const requiredFiles=["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","scripts/visual-hotfix-selfcheck.mjs","scripts/motion-v26-selfcheck.mjs","src/life-engine.js","src/visual-engine.js","src/cinema-engine.js","src/cinema-background.js","public/runtime-v14.js","public/avatar-runtime-v15.js","public/reset-runtime-v16.js","public/visual-runtime-v17.js","public/room-runtime-v19.js","public/pose-runtime-v20.js","public/core-runtime-v21.js","public/continuity-runtime-v22.js","public/cinema-runtime-v23.js","public/cinema-background-v23.js","public/motion-runtime-v26.js","migrations/0003_life_engine.sql"];
+const requiredFiles=["deploy.settings.json","scripts/prepare-cloudflare.mjs","scripts/verify-deployment.mjs","scripts/visual-hotfix-selfcheck.mjs","scripts/motion-v26-selfcheck.mjs","scripts/scene-manager-v29-selfcheck.mjs","src/index-v29.js","src/scene-library.js","src/life-engine.js","src/visual-engine.js","src/cinema-engine.js","src/cinema-background.js","public/runtime-v14.js","public/avatar-runtime-v15.js","public/reset-runtime-v16.js","public/visual-runtime-v17.js","public/room-runtime-v19.js","public/pose-runtime-v20.js","public/core-runtime-v21.js","public/continuity-runtime-v22.js","public/cinema-runtime-v23.js","public/cinema-background-v23.js","public/motion-runtime-v26.js","public/scene-manager-v29.js","migrations/0003_life_engine.sql","migrations/0004_scene_library.sql"];
 for(const f of requiredFiles)if(!fs.existsSync(f))errors.push(`missing deploy file ${f}`);
 if(wrangler.name!==settings.worker_name)errors.push(`worker name mismatch: ${wrangler.name} != ${settings.worker_name}`);
-if(wrangler.main!=="src/index.js")errors.push("wrangler main entry invalid");
+if(!["src/index.js","src/index-v29.js"].includes(wrangler.main))errors.push("wrangler main entry invalid");
 if(wrangler.ai?.binding!==settings.ai_binding)errors.push("Workers AI binding mismatch");
 if(wrangler.assets?.binding!=="ASSETS"||wrangler.assets?.directory!=="./public")errors.push("static assets binding invalid");
 const workflow=(wrangler.workflows||[]).find(x=>x.binding==="CINEMA_WORKFLOW");if(!workflow||workflow.name!=="my-life-room-cinema-v23"||workflow.class_name!=="CinemaBatchWorkflow")errors.push("Cinema Workflow binding invalid");
@@ -67,4 +71,4 @@ need(verify,["/api/health","/api/life/reset","scope:\"setup\"","scope:\"full\"",
 if(!cinemaBackground.includes('response_format:{type:"json_schema",json_schema:VISUAL_QC_SCHEMA}'))errors.push("Cinema visual QC must use Workers AI direct json_schema shape");
 if(!cinemaBackground.includes('response_format:{type:"json_schema",json_schema:MOTION_QC_SCHEMA}'))errors.push("Cinema motion QC must use Workers AI direct json_schema shape");
 if(errors.length){console.error(errors.join("\n"));process.exit(1)}
-console.log("P2 V26 preflight passed: life engine + 30/70 hybrid visuals + natural motion + Cinema + deployment bindings");
+console.log("P2 V29 preflight passed: existing engines + private scene library manager + deployment bindings");
