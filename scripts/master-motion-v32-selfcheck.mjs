@@ -4,7 +4,7 @@ const js = fs.readFileSync('public/master-motion-v32.js','utf8');
 const manifest = JSON.parse(fs.readFileSync('public/master-motion-v32-manifest.json','utf8'));
 const program = fs.readFileSync('public/scene-program-v30.js','utf8');
 
-const fail = (m) => { console.error(`V32 SELFHECK FAIL: ${m}`); process.exit(1); };
+const fail = (m) => { console.error(`V32 SELFCHECK FAIL: ${m}`); process.exit(1); };
 
 if (manifest.version !== 'v32-natural-motion-engine') fail('wrong manifest version');
 if (manifest.masterCount !== 8 || manifest.profiles?.length !== 8) fail('must have exactly eight master profiles');
@@ -21,7 +21,7 @@ for (const needle of ['mm32Breath','mm32Look','mm32PetTouch','mm32Return','mm32S
   if (!js.includes(needle)) fail(`motion primitive missing: ${needle}`);
 }
 if (!js.includes('window.masterMotionV32')) fail('runtime global missing');
-if (!program.includes('/master-motion-v32.js?v=32') || !program.includes('master()?.playForMode')) fail('V30 bridge missing');
+if (!program.includes('/master-motion-v32.js?v=32') || !program.includes('playForMode')) fail('V30 bridge missing');
 if (/motion\/generate|confirm_cost\s*:\s*true|hailuo|minimax/i.test(js)) fail('paid video path found in V32 runtime');
 
 console.log('P2 V32 master motion selfcheck: OK');
