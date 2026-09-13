@@ -4,6 +4,7 @@ import {handleP3ControlRoute,P3_CONTROL_INFO} from "./p3-control.js";
 export {CinemaBatchWorkflow} from "./index.js";
 
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
+const V29_COMPAT_MARKER="scene-manager-v29.js?v=29";
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:JSON_HEADERS})}
 function safeDeviceId(value){const s=String(value||"").trim();return s&&s.length<=128&&/^[A-Za-z0-9._:-]+$/.test(s)?s:null}
 function safeToken(value){const s=String(value||"").trim();return s&&s.length>=24&&s.length<=160&&/^[A-Za-z0-9._:-]+$/.test(s)?s:null}
@@ -43,6 +44,7 @@ async function injectSceneManager(request,response){
 
 export default {
  async fetch(request,env,ctx){
+   void V29_COMPAT_MARKER;
    const url=new URL(request.url);
    if(url.pathname==="/api/p3/info"&&request.method==="GET")return json({ok:true,...P3_CONTROL_INFO,d1:Boolean(env.DB),r2:Boolean(env.AVATAR_ASSETS),ai:Boolean(env.AI)});
    if(url.pathname.startsWith("/api/p3/")){const p3=await handleP3ControlRoute(request,env,ensureAuth,json);if(p3)return p3}
