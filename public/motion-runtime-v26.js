@@ -2,7 +2,7 @@
 "use strict";
 const VERSION="v26-natural-motion-free-bridge";
 const FRAME_ENGINE="/frame-motion-v27.js?v=27";
-const SCENE_ENGINE="/scene-runtime-v28.js?v=28";
+const SCENE_ENGINE="/scene-runtime-v28.js?v=30";
 const PROGRAM_ENGINE="/scene-program-v30.js?v=30";
 const LEGACY_SLOTS=["ambient","walk-sit","stand-walk","pet-touch","window-look","stretch"];
 const LEGACY_ENDPOINTS={status:"/api/motion/status",file:"/api/motion/file",generate:"/api/motion/generate"};
@@ -34,7 +34,8 @@ function addStyle(){
 
 function activateFreeAmbient(){const r=byId("room");if(!r)return false;r.classList.add("motion26-free");return true}
 function currentTimeValue(){try{return currentTime||"evening"}catch{return "evening"}}
-function startAmbient(){const p=program();if(p?.playCurrent)return p.playCurrent(currentTimeValue());const sc=scene();if(sc?.playContext)return sc.playContext(currentTimeValue());const fm=frame();return fm?.idle?.()||activateFreeAmbient()}
+function stopHumanScenes(){program()?.stop?.();scene()?.stop?.();return true}
+function startAmbient(){const t=currentTimeValue();if(t==="day"||t==="leave")return stopHumanScenes();const p=program();if(p?.playCurrent)return p.playCurrent(t);const sc=scene();if(sc?.playContext)return sc.playContext(t);const fm=frame();return fm?.idle?.()||activateFreeAmbient()}
 function playOneShot(slot){
  const p=program(),sc=scene();
  if(slot==="ambient"&&p?.playCurrent)return p.playCurrent(currentTimeValue());
@@ -84,22 +85,25 @@ function renderSetup(){
  if(!setupMode()){byId("motion26Setup")?.remove();return}
  let host=byId("motion26Setup");if(!host){host=document.createElement("div");host.id="motion26Setup";host.className="motion26Setup";const growth=document.querySelector("#home .growthCard");(growth?.parentElement||byId("home"))?.insertBefore(host,growth||null)}
  const sc=scene(),pg=program(),fm=frame(),sceneStatus=sc?.status?.(),frameReady=Boolean(fm?.ready?.()),readyScenes=Number(sceneStatus?.readyScenes)||0;
- host.innerHTML=`<b>🎬 P2 생활장면 V30</b><div class="ok">✓ 50개 생활장면 슬롯 자동 편성<br>✓ 현재 위치·시간대·최근 재생을 보고 장면 선택<br>✓ 연결이 없으면 V27 프레임 보조<br>✓ 실시간 유료 영상 AI 생성 안 함</div><div class="note">장면: ${readyScenes}/50 준비 · 편성엔진 ${pg?"연결됨":"로딩 중"}<br>프레임 보조: ${frameReady?"준비됨":"자산 대기"}<br>실사 30% + 애니풍 70% 기준 유지</div>`
+ host.innerHTML=`<b>🎬 P2 생활장면 V30</b><div class="ok">✓ 50개 생활장면 슬롯 자동 편성<br>✓ 현재 위치·시간대·최근 재생을 보고 장면 선택<br>✓ 낮/외출에는 본캐 생활영상 자동 정지<br>✓ 위험시간에는 마음진정 장면 우선<br>✓ 실시간 유료 영상 AI 생성 안 함</div><div class="note">장면: ${readyScenes}/50 준비 · 편성엔진 ${pg?"연결됨":"로딩 중"}<br>프레임 보조: ${frameReady?"준비됨":"자산 대기"}<br>실사 30% + 애니풍 70% 기준 유지</div>`
 }
 
 async function getStatus(){const sc=scene()?.status?.()||null,pg=program()?.status?.()||null;return {ok:true,engine:VERSION,free:true,sceneProgram:pg,sceneEngine:sc,frameEngine:Boolean(frame()),legacySlots:LEGACY_SLOTS,legacyEndpoints:LEGACY_ENDPOINTS}}
 async function generateAll(){return {ok:false,disabled:true,reason:"Paid video generation is disabled in P2. Use reusable free scene clips and the frame fallback engine."}}
 
 function wrap(name,after){const old=window[name];if(typeof old!=="function"||old.__motion26free)return;const fn=function(){const out=old.apply(this,arguments);Promise.resolve(out).finally(()=>after(...arguments));return out};fn.__motion26free=true;window[name]=fn}
-function playCurrentOrFallback(t){const p=program();if(p?.playCurrent)return p.playCurrent(t);const sc=scene();if(sc?.playContext)return sc.playContext(t);if(t==="morning")return frame()?.play?.("stretch");return frame()?.idle?.()}
+function playCurrentOrFallback(t){if(t==="day"||t==="leave")return stopHumanScenes();const p=program();if(p?.playCurrent)return p.playCurrent(t);const sc=scene();if(sc?.playContext)return sc.playContext(t);if(t==="morning")return frame()?.play?.("stretch");return frame()?.idle?.()}
+function playRisk(){const p=program();if(p?.playRisk)return p.playRisk();return scene()?.playGroupOnce?.("risk_calm",{tags:["risk","calm"]})||false}
 
 function install(){
  addStyle();activateFreeAmbient();loadFrameMotion27();setTimeout(loadHybrid,500);renderSetup();
  window.addEventListener("p2:scene-v28-ready",()=>{loadProgramV30();renderSetup()},{once:true});
- window.addEventListener("p2:scene-v30-ready",()=>{renderSetup();setTimeout(()=>program()?.playCurrent?.(currentTimeValue()),180)},{once:true});
+ window.addEventListener("p2:scene-v30-ready",()=>{renderSetup();setTimeout(()=>playCurrentOrFallback(currentTimeValue()),180)},{once:true});
  wrap("applyHome",()=>{activateFreeAmbient();setTimeout(()=>playCurrentOrFallback(currentTimeValue()),250)});
  wrap("setTime",t=>{activateFreeAmbient();setTimeout(()=>playCurrentOrFallback(t),300)});
- window.motionV26={version:VERSION,freeOnly:true,status:getStatus,refresh:getStatus,startAmbient,playOneShot,loadHybrid,generateAll,scene:()=>scene(),program:()=>program(),frame:()=>frame(),playRisk:()=>program()?.playRisk?.()||false,legacy:{slots:LEGACY_SLOTS,endpoints:LEGACY_ENDPOINTS,confirmMarker:LEGACY_CONFIRM_MARKER}}
+ wrap("openAlcohol",()=>setTimeout(playRisk,120));
+ wrap("openSmoking",()=>setTimeout(playRisk,120));
+ window.motionV26={version:VERSION,freeOnly:true,status:getStatus,refresh:getStatus,startAmbient,playOneShot,loadHybrid,generateAll,scene:()=>scene(),program:()=>program(),frame:()=>frame(),playRisk,legacy:{slots:LEGACY_SLOTS,endpoints:LEGACY_ENDPOINTS,confirmMarker:LEGACY_CONFIRM_MARKER}}
 }
 
 window.addEventListener("beforeunload",()=>{program()?.stop?.();scene()?.stop?.();if(hybridObjectUrl)try{URL.revokeObjectURL(hybridObjectUrl)}catch{}});
