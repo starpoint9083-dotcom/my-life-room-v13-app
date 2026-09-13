@@ -26,18 +26,18 @@ async function playForSlot(slotId,opts={}){const e=await waitV35();if(!e?.playFo
 async function playTransition(from,to){const e=await waitV35();if(!e?.playTransition)return false;if(!canRoute(from,to))return false;const my=++seq;await settle(120);if(my!==seq)return false;const ok=Boolean(await e.playTransition(from,to));if(my!==seq)return false;if(ok)await settle(SETTLE.transition);return ok}
 async function playForMode(mode){lastMode=String(mode||"");if(lastMode==="day")return false;const e=await waitV35();if(!e)return false;if(lastMode==="return"){
  const my=++seq;current="master_04_return_home>master_05_sit_down";
- const a=Boolean(await e.playMaster?.("master_04_return_home",{motionPolishV36:true}));if(my!==seq||!a)return false;markMaster("master_04_return_home");await settle(SETTLE.returnGap);if(my!==seq)return false;
- const b=Boolean(await e.playMaster?.("master_05_sit_down",{motionPolishV36:true}));if(my!==seq)return false;if(b){markMaster("master_05_sit_down");await settle(SETTLE.full)}current="";return Boolean(a&&b)
+ const a=Boolean(await e.playMaster?.("master_04_return_home",{motionPolishV36:true}));if(my!==seq||!a){current="";return false}markMaster("master_04_return_home");await settle(SETTLE.returnGap);if(my!==seq){current="";return false}
+ const b=Boolean(await e.playMaster?.("master_05_sit_down",{motionPolishV36:true}));if(my!==seq){current="";return false}if(b){markMaster("master_05_sit_down");await settle(SETTLE.full)}current="";return Boolean(a&&b)
  }
- if(Date.now()-lastPlayAt<SETTLE.modeGap)await settle(SETTLE.modeGap);if(seq<0)return false;
- const ok=Boolean(await e.playForMode?.(lastMode));if(ok){const st=e.status?.()||{};if(st.current||st.currentSlot){}lastPlayAt=Date.now();await settle(SETTLE.micro)}return ok
+ if(Date.now()-lastPlayAt<SETTLE.modeGap)await settle(SETTLE.modeGap);
+ const ok=Boolean(await e.playForMode?.(lastMode));if(ok){lastPlayAt=Date.now();await settle(SETTLE.micro)}return ok
 }
 async function playAllMasters(opts={}){const e=await waitV35();return e?.playAllMasters?e.playAllMasters(opts):{ok:false,results:[]}}
 function continuityReport(){return v35()?.continuityReport?.()||{total:0,counts:{},roughSlots:[]}}
 function qc(){const r=continuityReport();return {version:VERSION,total:r.total||0,counts:r.counts||{},roughSlots:r.roughSlots||[],repeatMaster:lastMaster,repeatCount,routePairs:[...ROUTES],settleMs:{...SETTLE},freeOnly:true,paidGeneration:false}}
 function stop(){seq++;v35()?.stop?.();current="";currentSlot=""}
 function status(){const s=v35()?.status?.()||{};return {version:VERSION,current,currentSlot,lastMode,lastMaster,repeatCount,logicalLocation:norm(s.logicalLocation),logicalPose:s.logicalPose||"standing",mappedSlots:s.mappedSlots||0,roughSlotCount:s.roughSlotCount||0,settleMs:{...SETTLE},freeOnly:true,paidGeneration:false,delegatesTo:"v35-continuity-qc"}}
-async function boot(){requestV35();const e=await waitV35();if(!e)return;window.masterMotionV36={version:VERSION,status,qc,continuityReport,qualityForSlot,naturalScore,canRoute,cadenceFor,canPlaySlot,mappedMaster,playMaster,playForSlot,playTransition,playForMode,playAllMasters,stop};window.dispatchEvent(new CustomEvent("p2:master-motion-v36-ready",{detail:status()}))}
+async function boot(){requestV35();const e=await waitV35();if(!e)return;window.masterMotionV36={version:VERSION,status,qc,continuityReport,qualityForSlot,naturalScore,normalizeLocation:norm,canRoute,cadenceFor,canPlaySlot,mappedMaster,playMaster,playForSlot,playTransition,playForMode,playAllMasters,stop};window.dispatchEvent(new CustomEvent("p2:master-motion-v36-ready",{detail:status()}))}
 window.addEventListener("beforeunload",()=>stop());
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1160),{once:true});else setTimeout(boot,1160);
 })();
