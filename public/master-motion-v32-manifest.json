@@ -1,0 +1,89 @@
+{
+  "version": "v32-natural-motion-engine",
+  "freeOnly": true,
+  "paidGeneration": false,
+  "styleBlend": "30-real-70-animation",
+  "masterCount": 8,
+  "profiles": [
+    {
+      "id": "master_01_sofa_relax",
+      "label": "소파에서 쉬기",
+      "sceneCandidates": ["sofa_relax_a", "sofa_relax_b", "sofa_deep_breathe", "sofa_lean_back"],
+      "frameSteps": ["sit_idle"],
+      "microClass": "mm32-sofa-relax",
+      "durationMs": 5200,
+      "requiresExtraFrames": false
+    },
+    {
+      "id": "master_02_window_gaze",
+      "label": "창밖 바라보기",
+      "sceneCandidates": ["window_breathe", "window_city_glance", "window_sunset_pause", "window_night_lights"],
+      "frameSteps": ["look"],
+      "microClass": "mm32-window-gaze",
+      "durationMs": 4800,
+      "requiresExtraFrames": false
+    },
+    {
+      "id": "master_03_pet_touch",
+      "label": "펫 쓰다듬기",
+      "sceneCandidates": ["pet_touch_calm", "pet_head_pat", "sofa_pet_touch", "pet_happy_react"],
+      "frameSteps": ["pet_touch"],
+      "microClass": "mm32-pet-touch",
+      "durationMs": 5000,
+      "requiresExtraFrames": false
+    },
+    {
+      "id": "master_04_return_home",
+      "label": "현관 귀가",
+      "sceneCandidates": ["standing_arrival_idle", "return_shoes_pause", "return_bag_down", "return_deep_breathe"],
+      "frameSteps": ["walk_start", "walk_loop", "walk_stop", "idle"],
+      "microClass": "mm32-return-home",
+      "durationMs": 5400,
+      "requiresExtraFrames": true
+    },
+    {
+      "id": "master_05_sit_down",
+      "label": "서 있다가 소파에 앉기",
+      "sceneCandidates": ["transition_entry_to_sofa", "transition_sofa_to_stand", "sofa_relax_a"],
+      "frameSteps": ["walk_to_sofa", "sit_down", "sit_idle"],
+      "microClass": "mm32-sit-down",
+      "durationMs": 5000,
+      "requiresExtraFrames": true
+    },
+    {
+      "id": "master_06_walk_to_window",
+      "label": "소파에서 일어나 창가로 걷기",
+      "sceneCandidates": ["transition_sofa_to_window", "window_city_glance", "window_breathe"],
+      "frameSteps": ["stand_up", "walk_to_window", "look"],
+      "microClass": "mm32-walk-window",
+      "durationMs": 5600,
+      "requiresExtraFrames": true
+    },
+    {
+      "id": "master_07_morning_life",
+      "label": "아침 생활",
+      "sceneCandidates": ["morning_stretch", "morning_water", "morning_window_light", "morning_pet_greet"],
+      "frameSteps": ["stretch", "idle"],
+      "microClass": "mm32-morning-life",
+      "durationMs": 5000,
+      "requiresExtraFrames": false
+    },
+    {
+      "id": "master_08_night_rest",
+      "label": "밤 휴식",
+      "sceneCandidates": ["night_rest", "night_phone_down", "night_deep_breathe", "sofa_lean_back"],
+      "frameSteps": ["sit_idle"],
+      "microClass": "mm32-night-rest",
+      "durationMs": 5600,
+      "requiresExtraFrames": false
+    }
+  ],
+  "modeMap": {
+    "morning": ["master_07_morning_life", "master_01_sofa_relax"],
+    "return": ["master_04_return_home", "master_05_sit_down"],
+    "day": [],
+    "evening": ["master_01_sofa_relax", "master_02_window_gaze", "master_03_pet_touch", "master_06_walk_to_window"],
+    "risk": ["master_02_window_gaze", "master_08_night_rest", "master_01_sofa_relax"],
+    "night": ["master_08_night_rest", "master_02_window_gaze"]
+  }
+}
