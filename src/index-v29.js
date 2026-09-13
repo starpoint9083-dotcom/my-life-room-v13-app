@@ -20,7 +20,7 @@ async function ensureAuth(request,env,allowCreate=true){
 const MOTION_STACK=[
  ["/frame-motion-v27.js","27"],
  ["/scene-library-v28.js","28"],
- ["/scene-manager-v29.js","31"],
+ ["/scene-manager-v29.js","29"],
  ["/scene-program-v30.js","30"],
  ["/master-motion-v32.js","32"],
  ["/master-motion-v33.js","33"],
@@ -30,7 +30,7 @@ const MOTION_STACK=[
  ["/motion-qc-v37.js","37"],
  ["/motion-auto-audit-v38.js","38"]
 ];
-async function injectMotionStack(request,response){
+async function injectSceneManager(request,response){
  if(request.method!=="GET"||!response?.ok)return response;
  const type=response.headers.get("content-type")||"";if(!type.includes("text/html"))return response;
  const html=await response.text();let tags="";
@@ -48,6 +48,6 @@ export default {
    if(url.pathname.startsWith("/api/p3/")){const p3=await handleP3ControlRoute(request,env,ensureAuth,json);if(p3)return p3}
    if(url.pathname==="/api/scene-library/info"&&request.method==="GET")return json({ok:true,...SCENE_LIBRARY_INFO,d1:Boolean(env.DB),r2:Boolean(env.AVATAR_ASSETS)});
    if(url.pathname.startsWith("/api/scene-library/")){const scene=await handleSceneLibraryRoute(request,env,ensureAuth,json);if(scene)return scene}
-   const response=await baseApp.fetch(request,env,ctx);return injectMotionStack(request,response)
+   const response=await baseApp.fetch(request,env,ctx);return injectSceneManager(request,response)
  }
 };
