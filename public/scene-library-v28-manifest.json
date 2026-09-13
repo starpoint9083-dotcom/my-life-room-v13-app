@@ -1,40 +1,693 @@
 {
   "version": "v28-scene-library",
+  "plannerVersion": "v30-smart-program",
   "styleBlend": "30-real-70-animation",
   "freeOnly": true,
   "paidGeneration": false,
+  "sceneCountGoal": 50,
   "clipPolicy": {
     "ambientMs": 6000,
     "transitionMsMin": 1000,
     "transitionMsMax": 3500,
     "crossfadeMs": 120,
-    "maxImmediateRepeat": 1
+    "maxImmediateRepeat": 1,
+    "sessionClipsMin": 2,
+    "sessionClipsMax": 4
   },
   "routines": {
-    "return_home": ["transition_entry_to_sofa", "sofa_relax"],
-    "morning": ["morning_stretch"],
-    "pet": ["transition_sofa_to_pet", "pet_touch_calm"],
-    "window": ["transition_sofa_to_window", "window_breathe"]
+    "return_home": [
+      "return_home",
+      "transition_entry_to_sofa",
+      "sofa_relax"
+    ],
+    "morning": [
+      "morning"
+    ],
+    "pet": [
+      "transition_sofa_to_pet",
+      "pet"
+    ],
+    "window": [
+      "transition_sofa_to_window",
+      "window"
+    ],
+    "risk": [
+      "risk_calm"
+    ],
+    "night": [
+      "night"
+    ]
+  },
+  "programs": {
+    "morning": {
+      "groups": [
+        "morning"
+      ],
+      "maxClips": 3,
+      "preferredLocation": "home"
+    },
+    "return": {
+      "groups": [
+        "return_home",
+        "sofa_relax"
+      ],
+      "maxClips": 4,
+      "preferredLocation": "entry"
+    },
+    "day": {
+      "groups": [
+        "window",
+        "pet",
+        "sofa_relax"
+      ],
+      "maxClips": 2
+    },
+    "evening": {
+      "groups": [
+        "sofa_relax",
+        "pet",
+        "window"
+      ],
+      "maxClips": 3,
+      "preferredLocation": "sofa"
+    },
+    "risk": {
+      "groups": [
+        "risk_calm",
+        "sofa_relax"
+      ],
+      "maxClips": 3,
+      "preferredLocation": "sofa"
+    },
+    "night": {
+      "groups": [
+        "night",
+        "sofa_relax"
+      ],
+      "maxClips": 3,
+      "preferredLocation": "sofa"
+    }
   },
   "scenes": [
-    {"id":"sofa_relax_a","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["evening","return","calm","blink","breathe"]},
-    {"id":"sofa_relax_b","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["evening","calm","head_turn","hand_shift"]},
-    {"id":"sofa_pet_glance","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["pet","glance","blink","evening"]},
-    {"id":"sofa_window_glance","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["window","glance","breathe","evening"]},
-    {"id":"sofa_phone_check","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["phone","hand","evening"]},
-    {"id":"sofa_deep_breathe","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["calm","breathe","night"]},
-    {"id":"standing_arrival_idle","group":"standing_idle","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"entry","pose":"standing"},"end":{"location":"entry","pose":"standing"},"tags":["return","blink","breathe"]},
-    {"id":"morning_stretch","group":"morning","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"home","pose":"standing"},"end":{"location":"home","pose":"standing"},"tags":["morning","stretch","breathe"]},
-    {"id":"window_breathe","group":"window","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"window","pose":"standing"},"end":{"location":"window","pose":"standing"},"tags":["window","calm","breathe","day"]},
-    {"id":"pet_touch_calm","group":"pet","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"pet","pose":"crouch"},"end":{"location":"pet","pose":"crouch"},"tags":["pet","touch","calm"]},
-    {"id":"water_sip","group":"standing_idle","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"home","pose":"standing"},"end":{"location":"home","pose":"standing"},"tags":["water","hand","day"]},
-    {"id":"night_rest","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["night","calm","blink"]},
-
-    {"id":"transition_entry_to_sofa","group":"transition","type":"transition","ready":false,"src":"","durationMs":2500,"start":{"location":"entry","pose":"standing"},"end":{"location":"sofa","pose":"seated"},"tags":["walk","sit","return"]},
-    {"id":"transition_sofa_to_stand","group":"transition","type":"transition","ready":false,"src":"","durationMs":1800,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"standing"},"tags":["stand"]},
-    {"id":"transition_sofa_to_window","group":"transition","type":"transition","ready":false,"src":"","durationMs":2800,"start":{"location":"sofa","pose":"seated"},"end":{"location":"window","pose":"standing"},"tags":["stand","walk","window"]},
-    {"id":"transition_window_to_sofa","group":"transition","type":"transition","ready":false,"src":"","durationMs":2800,"start":{"location":"window","pose":"standing"},"end":{"location":"sofa","pose":"seated"},"tags":["walk","sit"]},
-    {"id":"transition_sofa_to_pet","group":"transition","type":"transition","ready":false,"src":"","durationMs":2400,"start":{"location":"sofa","pose":"seated"},"end":{"location":"pet","pose":"crouch"},"tags":["stand","walk","pet"]},
-    {"id":"transition_pet_to_sofa","group":"transition","type":"transition","ready":false,"src":"","durationMs":2400,"start":{"location":"pet","pose":"crouch"},"end":{"location":"sofa","pose":"seated"},"tags":["stand","walk","sit"]}
+    {
+      "id": "morning_wake_breathe",
+      "label": "아침에 천천히 숨 고르기",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "home", "pose": "standing"},
+      "end": {"location": "home", "pose": "standing"},
+      "tags": ["morning", "calm", "blink", "breathe"]
+    },
+    {
+      "id": "morning_stretch",
+      "label": "아침 스트레칭",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "home", "pose": "standing"},
+      "end": {"location": "home", "pose": "standing"},
+      "tags": ["morning", "stretch", "breathe"]
+    },
+    {
+      "id": "morning_window_light",
+      "label": "아침 햇살 바라보기",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["morning", "window", "light", "calm"]
+    },
+    {
+      "id": "morning_water",
+      "label": "아침 물 한 모금",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "home", "pose": "standing"},
+      "end": {"location": "home", "pose": "standing"},
+      "tags": ["morning", "water", "hand"]
+    },
+    {
+      "id": "morning_pet_greet",
+      "label": "아침에 펫 인사하기",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["morning", "pet", "touch"]
+    },
+    {
+      "id": "morning_sit_calm",
+      "label": "아침 소파에 잠깐 앉기",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["morning", "sofa", "calm", "breathe"]
+    },
+    {
+      "id": "morning_phone_glance",
+      "label": "아침 휴대폰 잠깐 확인",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["morning", "phone", "glance"]
+    },
+    {
+      "id": "morning_ready_leave",
+      "label": "외출 준비 후 잠깐 멈춤",
+      "group": "morning",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "entry", "pose": "standing"},
+      "end": {"location": "entry", "pose": "standing"},
+      "tags": ["morning", "leave", "standing", "breathe"]
+    },
+    {
+      "id": "standing_arrival_idle",
+      "label": "퇴근 후 현관에서 숨 고르기",
+      "group": "return_home",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "entry", "pose": "standing"},
+      "end": {"location": "entry", "pose": "standing"},
+      "tags": ["return", "evening", "blink", "breathe"]
+    },
+    {
+      "id": "return_shoes_pause",
+      "label": "현관에서 잠깐 멈추기",
+      "group": "return_home",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "entry", "pose": "standing"},
+      "end": {"location": "entry", "pose": "standing"},
+      "tags": ["return", "pause", "evening"]
+    },
+    {
+      "id": "return_bag_down",
+      "label": "퇴근 후 짐 내려놓기",
+      "group": "return_home",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "entry", "pose": "standing"},
+      "end": {"location": "entry", "pose": "standing"},
+      "tags": ["return", "hand", "evening"]
+    },
+    {
+      "id": "return_deep_breathe",
+      "label": "집에 와서 깊게 숨쉬기",
+      "group": "return_home",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "entry", "pose": "standing"},
+      "end": {"location": "entry", "pose": "standing"},
+      "tags": ["return", "calm", "breathe", "evening"]
+    },
+    {
+      "id": "return_pet_greet",
+      "label": "퇴근 후 펫 반기기",
+      "group": "return_home",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["return", "pet", "touch", "evening"]
+    },
+    {
+      "id": "return_window_glance",
+      "label": "귀가 후 창밖 한번 보기",
+      "group": "return_home",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["return", "window", "glance", "evening"]
+    },
+    {
+      "id": "sofa_relax_a",
+      "label": "소파에서 편하게 쉬기 1",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["evening", "return", "calm", "blink", "breathe"]
+    },
+    {
+      "id": "sofa_relax_b",
+      "label": "소파에서 편하게 쉬기 2",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["evening", "calm", "head_turn", "hand_shift"]
+    },
+    {
+      "id": "sofa_pet_glance",
+      "label": "소파에서 펫 바라보기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["pet", "glance", "blink", "evening"]
+    },
+    {
+      "id": "sofa_window_glance",
+      "label": "소파에서 창밖 보기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["window", "glance", "breathe", "evening"]
+    },
+    {
+      "id": "sofa_phone_check",
+      "label": "소파에서 휴대폰 보기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["phone", "hand", "evening"]
+    },
+    {
+      "id": "sofa_deep_breathe",
+      "label": "소파에서 깊게 숨쉬기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["calm", "breathe", "night"]
+    },
+    {
+      "id": "sofa_hand_shift",
+      "label": "앉아서 손 위치 바꾸기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["hand_shift", "calm", "evening"]
+    },
+    {
+      "id": "sofa_leg_shift",
+      "label": "앉아서 다리 자세 바꾸기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["leg_shift", "calm", "evening"]
+    },
+    {
+      "id": "sofa_lean_back",
+      "label": "소파에 기대어 쉬기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["lean", "calm", "evening"]
+    },
+    {
+      "id": "sofa_cup_hold",
+      "label": "소파에서 컵 들고 있기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["cup", "hand", "evening"]
+    },
+    {
+      "id": "sofa_pet_touch",
+      "label": "소파에서 펫 쓰다듬기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["pet", "touch", "evening"]
+    },
+    {
+      "id": "sofa_quiet_smile",
+      "label": "소파에서 조용히 미소 짓기",
+      "group": "sofa_relax",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["smile", "calm", "success", "evening"]
+    },
+    {
+      "id": "window_breathe",
+      "label": "창가에서 숨 고르기",
+      "group": "window",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["window", "calm", "breathe", "day"]
+    },
+    {
+      "id": "window_city_glance",
+      "label": "창밖 도시 바라보기",
+      "group": "window",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["window", "city", "glance", "day", "evening"]
+    },
+    {
+      "id": "window_hand_pocket",
+      "label": "창가에서 손을 주머니에 넣기",
+      "group": "window",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["window", "hand", "calm"]
+    },
+    {
+      "id": "window_sunset_pause",
+      "label": "노을 보며 잠깐 멈추기",
+      "group": "window",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["window", "sunset", "evening", "calm"]
+    },
+    {
+      "id": "window_night_lights",
+      "label": "밤 창밖 불빛 바라보기",
+      "group": "window",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["window", "night", "calm", "lights"]
+    },
+    {
+      "id": "pet_touch_calm",
+      "label": "펫 천천히 쓰다듬기",
+      "group": "pet",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["pet", "touch", "calm"]
+    },
+    {
+      "id": "pet_head_pat",
+      "label": "펫 머리 쓰다듬기",
+      "group": "pet",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["pet", "head", "touch"]
+    },
+    {
+      "id": "pet_side_glance",
+      "label": "펫 옆에서 바라보기",
+      "group": "pet",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["pet", "glance", "calm"]
+    },
+    {
+      "id": "pet_sit_together",
+      "label": "펫과 나란히 쉬기",
+      "group": "pet",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "seated"},
+      "end": {"location": "pet", "pose": "seated"},
+      "tags": ["pet", "sit", "calm"]
+    },
+    {
+      "id": "pet_happy_react",
+      "label": "펫 반응에 미소 짓기",
+      "group": "pet",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["pet", "smile", "success"]
+    },
+    {
+      "id": "water_sip",
+      "label": "물 한 모금 마시기",
+      "group": "risk_calm",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "home", "pose": "standing"},
+      "end": {"location": "home", "pose": "standing"},
+      "tags": ["water", "hand", "risk", "calm"]
+    },
+    {
+      "id": "risk_breathe",
+      "label": "흔들릴 때 깊게 숨 고르기",
+      "group": "risk_calm",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["risk", "calm", "breathe", "evening"]
+    },
+    {
+      "id": "risk_hands_together",
+      "label": "손을 모으고 잠깐 생각하기",
+      "group": "risk_calm",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["risk", "hands", "pause", "evening"]
+    },
+    {
+      "id": "risk_message_pause",
+      "label": "맑은 나의 메시지를 본 뒤 멈춤",
+      "group": "risk_calm",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["risk", "message", "pause", "evening"]
+    },
+    {
+      "id": "risk_window_reset",
+      "label": "창가에서 마음 다시 잡기",
+      "group": "risk_calm",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["risk", "window", "reset", "calm", "evening"]
+    },
+    {
+      "id": "night_rest",
+      "label": "밤에 소파에서 쉬기",
+      "group": "night",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["night", "calm", "blink"]
+    },
+    {
+      "id": "night_phone_down",
+      "label": "밤에 휴대폰 내려놓기",
+      "group": "night",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["night", "phone", "calm"]
+    },
+    {
+      "id": "night_deep_breathe",
+      "label": "잠들기 전 깊게 숨쉬기",
+      "group": "night",
+      "type": "ambient",
+      "ready": false,
+      "src": "",
+      "durationMs": 6000,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["night", "breathe", "calm"]
+    },
+    {
+      "id": "transition_entry_to_sofa",
+      "label": "현관에서 소파로 이동해 앉기",
+      "group": "transition",
+      "type": "transition",
+      "ready": false,
+      "src": "",
+      "durationMs": 2500,
+      "start": {"location": "entry", "pose": "standing"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["walk", "sit", "return"]
+    },
+    {
+      "id": "transition_sofa_to_stand",
+      "label": "소파에서 일어서기",
+      "group": "transition",
+      "type": "transition",
+      "ready": false,
+      "src": "",
+      "durationMs": 1800,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "sofa", "pose": "standing"},
+      "tags": ["stand"]
+    },
+    {
+      "id": "transition_sofa_to_window",
+      "label": "소파에서 창가로 이동",
+      "group": "transition",
+      "type": "transition",
+      "ready": false,
+      "src": "",
+      "durationMs": 2800,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "window", "pose": "standing"},
+      "tags": ["stand", "walk", "window"]
+    },
+    {
+      "id": "transition_window_to_sofa",
+      "label": "창가에서 소파로 이동해 앉기",
+      "group": "transition",
+      "type": "transition",
+      "ready": false,
+      "src": "",
+      "durationMs": 2800,
+      "start": {"location": "window", "pose": "standing"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["walk", "sit"]
+    },
+    {
+      "id": "transition_sofa_to_pet",
+      "label": "소파에서 펫에게 다가가기",
+      "group": "transition",
+      "type": "transition",
+      "ready": false,
+      "src": "",
+      "durationMs": 2400,
+      "start": {"location": "sofa", "pose": "seated"},
+      "end": {"location": "pet", "pose": "crouch"},
+      "tags": ["stand", "walk", "pet"]
+    },
+    {
+      "id": "transition_pet_to_sofa",
+      "label": "펫에서 소파로 돌아와 앉기",
+      "group": "transition",
+      "type": "transition",
+      "ready": false,
+      "src": "",
+      "durationMs": 2400,
+      "start": {"location": "pet", "pose": "crouch"},
+      "end": {"location": "sofa", "pose": "seated"},
+      "tags": ["stand", "walk", "sit"]
+    }
   ]
 }

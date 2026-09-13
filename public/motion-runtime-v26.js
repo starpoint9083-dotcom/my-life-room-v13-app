@@ -2,16 +2,18 @@
 "use strict";
 const VERSION="v26-natural-motion-free-bridge";
 const FRAME_ENGINE="/frame-motion-v27.js?v=27";
-const SCENE_ENGINE="/scene-runtime-v28.js?v=28";
+const SCENE_ENGINE="/scene-runtime-v28.js?v=30";
+const PROGRAM_ENGINE="/scene-program-v30.js?v=30";
 const LEGACY_SLOTS=["ambient","walk-sit","stand-walk","pet-touch","window-look","stretch"];
 const LEGACY_ENDPOINTS={status:"/api/motion/status",file:"/api/motion/file",generate:"/api/motion/generate"};
 const LEGACY_CONFIRM_MARKER="confirm_cost:true";
 const byId=id=>document.getElementById(id);
-let hybridCutout="",hybridObjectUrl="",frameLoaded=false,sceneLoaded=false;
+let hybridCutout="",hybridObjectUrl="",frameLoaded=false,sceneLoaded=false,programLoaded=false;
 
 function auth(extra={}){try{return typeof authHeaders==="function"?authHeaders(extra):extra}catch{return extra}}
 function setupMode(){return new URL(location.href).searchParams.get("motionSetup")==="1"}
 function scene(){return window.sceneV28||null}
+function program(){return window.sceneProgramV30||null}
 function frame(){return window.frameMotionV27||null}
 
 function addStyle(){
@@ -32,9 +34,11 @@ function addStyle(){
 
 function activateFreeAmbient(){const r=byId("room");if(!r)return false;r.classList.add("motion26-free");return true}
 function currentTimeValue(){try{return currentTime||"evening"}catch{return "evening"}}
-function startAmbient(){const sc=scene();if(sc?.playContext)return sc.playContext(currentTimeValue());const fm=frame();return fm?.idle?.()||activateFreeAmbient()}
+function stopHumanScenes(){program()?.stop?.();scene()?.stop?.();return true}
+function startAmbient(){const t=currentTimeValue();if(t==="day"||t==="leave")return stopHumanScenes();const p=program();if(p?.playCurrent)return p.playCurrent(t);const sc=scene();if(sc?.playContext)return sc.playContext(t);const fm=frame();return fm?.idle?.()||activateFreeAmbient()}
 function playOneShot(slot){
- const sc=scene();
+ const p=program(),sc=scene();
+ if(slot==="ambient"&&p?.playCurrent)return p.playCurrent(currentTimeValue());
  if(sc){
    if(slot==="walk-sit")return sc.runRoutine?.("return_home")||false;
    if(slot==="pet-touch")return sc.runRoutine?.("pet")||false;
@@ -64,9 +68,13 @@ async function loadHybrid(){
  }catch(e){console.warn("hybrid current",e);return false}
 }
 
+function loadProgramV30(){
+ if(programLoaded||document.querySelector('script[data-scene-program-v30]'))return;
+ programLoaded=true;const s=document.createElement("script");s.src=PROGRAM_ENGINE;s.async=true;s.dataset.sceneProgramV30="1";s.onload=renderSetup;document.head.appendChild(s)
+}
 function loadSceneV28(){
- if(sceneLoaded||document.querySelector('script[data-scene-v28]'))return;
- sceneLoaded=true;const s=document.createElement("script");s.src=SCENE_ENGINE;s.async=true;s.dataset.sceneV28="1";s.onload=()=>{renderSetup();activateFreeAmbient()};document.head.appendChild(s)
+ if(sceneLoaded||document.querySelector('script[data-scene-v28]')){loadProgramV30();return}
+ sceneLoaded=true;const s=document.createElement("script");s.src=SCENE_ENGINE;s.async=true;s.dataset.sceneV28="1";s.onload=()=>{loadProgramV30();renderSetup();activateFreeAmbient()};document.head.appendChild(s)
 }
 function loadFrameMotion27(){
  if(frameLoaded||document.querySelector('script[data-frame-motion-v27]')){loadSceneV28();return}
@@ -76,23 +84,28 @@ function loadFrameMotion27(){
 function renderSetup(){
  if(!setupMode()){byId("motion26Setup")?.remove();return}
  let host=byId("motion26Setup");if(!host){host=document.createElement("div");host.id="motion26Setup";host.className="motion26Setup";const growth=document.querySelector("#home .growthCard");(growth?.parentElement||byId("home"))?.insertBefore(host,growth||null)}
- const sc=scene(),fm=frame(),sceneStatus=sc?.status?.(),frameReady=Boolean(fm?.ready?.()),readyScenes=Number(sceneStatus?.readyScenes)||0;
- host.innerHTML=`<b>🎬 P2 생활장면 V28</b><div class="ok">✓ 주력: 저장된 4~6초 생활장면 라이브러리<br>✓ 연결: 짧은 전환장면 또는 V27 프레임 보조<br>✓ 실시간 유료 영상 AI 생성 안 함</div><div class="note">생활장면: ${readyScenes}개 준비됨 · 프로그램 ${sc?"연결됨":"로딩 중"}<br>프레임 보조: ${frameReady?"준비됨":"자산 대기"}<br>실사 30% + 애니풍 70% 기준 유지</div>`
+ const sc=scene(),pg=program(),fm=frame(),sceneStatus=sc?.status?.(),frameReady=Boolean(fm?.ready?.()),readyScenes=Number(sceneStatus?.readyScenes)||0;
+ host.innerHTML=`<b>🎬 P2 생활장면 V30</b><div class="ok">✓ 50개 생활장면 슬롯 자동 편성<br>✓ 현재 위치·시간대·최근 재생을 보고 장면 선택<br>✓ 낮/외출에는 본캐 생활영상 자동 정지<br>✓ 위험시간에는 마음진정 장면 우선<br>✓ 실시간 유료 영상 AI 생성 안 함</div><div class="note">장면: ${readyScenes}/50 준비 · 편성엔진 ${pg?"연결됨":"로딩 중"}<br>프레임 보조: ${frameReady?"준비됨":"자산 대기"}<br>실사 30% + 애니풍 70% 기준 유지</div>`
 }
 
-async function getStatus(){const sc=scene()?.status?.()||null;return {ok:true,engine:VERSION,free:true,sceneEngine:sc,frameEngine:Boolean(frame()),legacySlots:LEGACY_SLOTS,legacyEndpoints:LEGACY_ENDPOINTS}}
+async function getStatus(){const sc=scene()?.status?.()||null,pg=program()?.status?.()||null;return {ok:true,engine:VERSION,free:true,sceneProgram:pg,sceneEngine:sc,frameEngine:Boolean(frame()),legacySlots:LEGACY_SLOTS,legacyEndpoints:LEGACY_ENDPOINTS}}
 async function generateAll(){return {ok:false,disabled:true,reason:"Paid video generation is disabled in P2. Use reusable free scene clips and the frame fallback engine."}}
 
 function wrap(name,after){const old=window[name];if(typeof old!=="function"||old.__motion26free)return;const fn=function(){const out=old.apply(this,arguments);Promise.resolve(out).finally(()=>after(...arguments));return out};fn.__motion26free=true;window[name]=fn}
+function playCurrentOrFallback(t){if(t==="day"||t==="leave")return stopHumanScenes();const p=program();if(p?.playCurrent)return p.playCurrent(t);const sc=scene();if(sc?.playContext)return sc.playContext(t);if(t==="morning")return frame()?.play?.("stretch");return frame()?.idle?.()}
+function playRisk(){const p=program();if(p?.playRisk)return p.playRisk();return scene()?.playGroupOnce?.("risk_calm",{tags:["risk","calm"]})||false}
 
 function install(){
  addStyle();activateFreeAmbient();loadFrameMotion27();setTimeout(loadHybrid,500);renderSetup();
- window.addEventListener("p2:scene-v28-ready",()=>{renderSetup();setTimeout(()=>scene()?.playContext?.(currentTimeValue()),180)},{once:true});
- wrap("applyHome",()=>{activateFreeAmbient();setTimeout(()=>{const sc=scene();if(sc?.playContext)sc.playContext(currentTimeValue());else frame()?.idle?.()},250)});
- wrap("setTime",t=>{activateFreeAmbient();setTimeout(()=>{const sc=scene();if(sc?.playContext)sc.playContext(t);else if(t==="morning")frame()?.play?.("stretch");else frame()?.idle?.()},300)});
- window.motionV26={version:VERSION,freeOnly:true,status:getStatus,refresh:getStatus,startAmbient,playOneShot,loadHybrid,generateAll,scene:()=>scene(),frame:()=>frame(),legacy:{slots:LEGACY_SLOTS,endpoints:LEGACY_ENDPOINTS,confirmMarker:LEGACY_CONFIRM_MARKER}}
+ window.addEventListener("p2:scene-v28-ready",()=>{loadProgramV30();renderSetup()},{once:true});
+ window.addEventListener("p2:scene-v30-ready",()=>{renderSetup();setTimeout(()=>playCurrentOrFallback(currentTimeValue()),180)},{once:true});
+ wrap("applyHome",()=>{activateFreeAmbient();setTimeout(()=>playCurrentOrFallback(currentTimeValue()),250)});
+ wrap("setTime",t=>{activateFreeAmbient();setTimeout(()=>playCurrentOrFallback(t),300)});
+ wrap("openAlcohol",()=>setTimeout(playRisk,120));
+ wrap("openSmoking",()=>setTimeout(playRisk,120));
+ window.motionV26={version:VERSION,freeOnly:true,status:getStatus,refresh:getStatus,startAmbient,playOneShot,loadHybrid,generateAll,scene:()=>scene(),program:()=>program(),frame:()=>frame(),playRisk,legacy:{slots:LEGACY_SLOTS,endpoints:LEGACY_ENDPOINTS,confirmMarker:LEGACY_CONFIRM_MARKER}}
 }
 
-window.addEventListener("beforeunload",()=>{scene()?.stop?.();if(hybridObjectUrl)try{URL.revokeObjectURL(hybridObjectUrl)}catch{}});
+window.addEventListener("beforeunload",()=>{program()?.stop?.();scene()?.stop?.();if(hybridObjectUrl)try{URL.revokeObjectURL(hybridObjectUrl)}catch{}});
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
 })();
