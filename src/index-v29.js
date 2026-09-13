@@ -20,7 +20,7 @@ async function ensureAuth(request,env,allowCreate=true){
 }
 const MOTION_STACK=[
  ["/frame-motion-v27.js","27"],
- ["/scene-library-v28.js","28"],
+ ["/scene-runtime-v28.js","28"],
  ["/scene-manager-v29.js","29"],
  ["/scene-program-v30.js","30"],
  ["/master-motion-v32.js","32"],
