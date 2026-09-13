@@ -2,14 +2,17 @@
 "use strict";
 const VERSION="v26-natural-motion-free-bridge";
 const FRAME_ENGINE="/frame-motion-v27.js?v=27";
+const SCENE_ENGINE="/scene-runtime-v28.js?v=28";
 const LEGACY_SLOTS=["ambient","walk-sit","stand-walk","pet-touch","window-look","stretch"];
 const LEGACY_ENDPOINTS={status:"/api/motion/status",file:"/api/motion/file",generate:"/api/motion/generate"};
 const LEGACY_CONFIRM_MARKER="confirm_cost:true";
 const byId=id=>document.getElementById(id);
-let hybridCutout="",hybridObjectUrl="",frameLoaded=false;
+let hybridCutout="",hybridObjectUrl="",frameLoaded=false,sceneLoaded=false;
 
 function auth(extra={}){try{return typeof authHeaders==="function"?authHeaders(extra):extra}catch{return extra}}
 function setupMode(){return new URL(location.href).searchParams.get("motionSetup")==="1"}
+function scene(){return window.sceneV28||null}
+function frame(){return window.frameMotionV27||null}
 
 function addStyle(){
  if(byId("motion26Style"))return;
@@ -28,9 +31,18 @@ function addStyle(){
 }
 
 function activateFreeAmbient(){const r=byId("room");if(!r)return false;r.classList.add("motion26-free");return true}
-function startAmbient(){return activateFreeAmbient()}
+function currentTimeValue(){try{return currentTime||"evening"}catch{return "evening"}}
+function startAmbient(){const sc=scene();if(sc?.playContext)return sc.playContext(currentTimeValue());const fm=frame();return fm?.idle?.()||activateFreeAmbient()}
 function playOneShot(slot){
- const fm=window.frameMotionV27;if(!fm?.ready?.())return false;
+ const sc=scene();
+ if(sc){
+   if(slot==="walk-sit")return sc.runRoutine?.("return_home")||false;
+   if(slot==="pet-touch")return sc.runRoutine?.("pet")||false;
+   if(slot==="window-look")return sc.runRoutine?.("window")||false;
+   if(slot==="stretch")return sc.runRoutine?.("morning")||false;
+   if(slot==="ambient")return sc.playContext?.(currentTimeValue())||false;
+ }
+ const fm=frame();if(!fm?.ready?.())return false;
  if(slot==="walk-sit")return fm.sit?.()||false;
  if(slot==="stand-walk")return fm.stand?.()||false;
  if(slot==="pet-touch")return fm.pet?.()||false;
@@ -52,30 +64,35 @@ async function loadHybrid(){
  }catch(e){console.warn("hybrid current",e);return false}
 }
 
+function loadSceneV28(){
+ if(sceneLoaded||document.querySelector('script[data-scene-v28]'))return;
+ sceneLoaded=true;const s=document.createElement("script");s.src=SCENE_ENGINE;s.async=true;s.dataset.sceneV28="1";s.onload=()=>{renderSetup();activateFreeAmbient()};document.head.appendChild(s)
+}
 function loadFrameMotion27(){
- if(frameLoaded||document.querySelector('script[data-frame-motion-v27]'))return;
- frameLoaded=true;const s=document.createElement("script");s.src=FRAME_ENGINE;s.async=true;s.dataset.frameMotionV27="1";s.onload=()=>{renderSetup();activateFreeAmbient()};document.head.appendChild(s)
+ if(frameLoaded||document.querySelector('script[data-frame-motion-v27]')){loadSceneV28();return}
+ frameLoaded=true;const s=document.createElement("script");s.src=FRAME_ENGINE;s.async=true;s.dataset.frameMotionV27="1";s.onload=()=>{loadSceneV28();renderSetup();activateFreeAmbient()};document.head.appendChild(s)
 }
 
 function renderSetup(){
  if(!setupMode()){byId("motion26Setup")?.remove();return}
  let host=byId("motion26Setup");if(!host){host=document.createElement("div");host.id="motion26Setup";host.className="motion26Setup";const growth=document.querySelector("#home .growthCard");(growth?.parentElement||byId("home"))?.insertBefore(host,growth||null)}
- const fm=window.frameMotionV27,ready=Boolean(fm?.ready?.());
- host.innerHTML=`<b>🎞️ P2 무료 프레임 모션</b><div class="ok">✓ 유료 영상 AI 사용 안 함<br>✓ 방 고정 · 본캐/펫 프레임만 교체<br>✓ 걷기·앉기·일어나기·펫 상호작용을 다중프레임으로 재생</div><div class="note">프레임 엔진: ${ready?"준비됨":"프로그램 준비됨 · 동작 프레임 자산 대기"}<br>실사 30% + 애니풍 70% 기준 유지</div>`
+ const sc=scene(),fm=frame(),sceneStatus=sc?.status?.(),frameReady=Boolean(fm?.ready?.()),readyScenes=Number(sceneStatus?.readyScenes)||0;
+ host.innerHTML=`<b>🎬 P2 생활장면 V28</b><div class="ok">✓ 주력: 저장된 4~6초 생활장면 라이브러리<br>✓ 연결: 짧은 전환장면 또는 V27 프레임 보조<br>✓ 실시간 유료 영상 AI 생성 안 함</div><div class="note">생활장면: ${readyScenes}개 준비됨 · 프로그램 ${sc?"연결됨":"로딩 중"}<br>프레임 보조: ${frameReady?"준비됨":"자산 대기"}<br>실사 30% + 애니풍 70% 기준 유지</div>`
 }
 
-async function getStatus(){return {ok:true,engine:VERSION,free:true,frameEngine:Boolean(window.frameMotionV27),legacySlots:LEGACY_SLOTS,legacyEndpoints:LEGACY_ENDPOINTS}}
-async function generateAll(){return {ok:false,disabled:true,reason:"Paid video generation is disabled in P2. Use free multi-frame animation."}}
+async function getStatus(){const sc=scene()?.status?.()||null;return {ok:true,engine:VERSION,free:true,sceneEngine:sc,frameEngine:Boolean(frame()),legacySlots:LEGACY_SLOTS,legacyEndpoints:LEGACY_ENDPOINTS}}
+async function generateAll(){return {ok:false,disabled:true,reason:"Paid video generation is disabled in P2. Use reusable free scene clips and the frame fallback engine."}}
 
 function wrap(name,after){const old=window[name];if(typeof old!=="function"||old.__motion26free)return;const fn=function(){const out=old.apply(this,arguments);Promise.resolve(out).finally(()=>after(...arguments));return out};fn.__motion26free=true;window[name]=fn}
 
 function install(){
  addStyle();activateFreeAmbient();loadFrameMotion27();setTimeout(loadHybrid,500);renderSetup();
- wrap("applyHome",()=>{activateFreeAmbient();setTimeout(()=>window.frameMotionV27?.idle?.(),250)});
- wrap("setTime",t=>{activateFreeAmbient();setTimeout(()=>{if(t==="morning")window.frameMotionV27?.play?.("stretch");else window.frameMotionV27?.idle?.()},300)});
- window.motionV26={version:VERSION,freeOnly:true,status:getStatus,refresh:getStatus,startAmbient,playOneShot,loadHybrid,generateAll,legacy:{slots:LEGACY_SLOTS,endpoints:LEGACY_ENDPOINTS,confirmMarker:LEGACY_CONFIRM_MARKER}}
+ window.addEventListener("p2:scene-v28-ready",()=>{renderSetup();setTimeout(()=>scene()?.playContext?.(currentTimeValue()),180)},{once:true});
+ wrap("applyHome",()=>{activateFreeAmbient();setTimeout(()=>{const sc=scene();if(sc?.playContext)sc.playContext(currentTimeValue());else frame()?.idle?.()},250)});
+ wrap("setTime",t=>{activateFreeAmbient();setTimeout(()=>{const sc=scene();if(sc?.playContext)sc.playContext(t);else if(t==="morning")frame()?.play?.("stretch");else frame()?.idle?.()},300)});
+ window.motionV26={version:VERSION,freeOnly:true,status:getStatus,refresh:getStatus,startAmbient,playOneShot,loadHybrid,generateAll,scene:()=>scene(),frame:()=>frame(),legacy:{slots:LEGACY_SLOTS,endpoints:LEGACY_ENDPOINTS,confirmMarker:LEGACY_CONFIRM_MARKER}}
 }
 
-window.addEventListener("beforeunload",()=>{if(hybridObjectUrl)try{URL.revokeObjectURL(hybridObjectUrl)}catch{}});
+window.addEventListener("beforeunload",()=>{scene()?.stop?.();if(hybridObjectUrl)try{URL.revokeObjectURL(hybridObjectUrl)}catch{}});
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
 })();
