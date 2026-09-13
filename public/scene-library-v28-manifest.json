@@ -1,0 +1,40 @@
+{
+  "version": "v28-scene-library",
+  "styleBlend": "30-real-70-animation",
+  "freeOnly": true,
+  "paidGeneration": false,
+  "clipPolicy": {
+    "ambientMs": 6000,
+    "transitionMsMin": 1000,
+    "transitionMsMax": 3500,
+    "crossfadeMs": 120,
+    "maxImmediateRepeat": 1
+  },
+  "routines": {
+    "return_home": ["transition_entry_to_sofa", "sofa_relax"],
+    "morning": ["morning_stretch"],
+    "pet": ["transition_sofa_to_pet", "pet_touch_calm"],
+    "window": ["transition_sofa_to_window", "window_breathe"]
+  },
+  "scenes": [
+    {"id":"sofa_relax_a","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["evening","return","calm","blink","breathe"]},
+    {"id":"sofa_relax_b","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["evening","calm","head_turn","hand_shift"]},
+    {"id":"sofa_pet_glance","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["pet","glance","blink","evening"]},
+    {"id":"sofa_window_glance","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["window","glance","breathe","evening"]},
+    {"id":"sofa_phone_check","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["phone","hand","evening"]},
+    {"id":"sofa_deep_breathe","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["calm","breathe","night"]},
+    {"id":"standing_arrival_idle","group":"standing_idle","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"entry","pose":"standing"},"end":{"location":"entry","pose":"standing"},"tags":["return","blink","breathe"]},
+    {"id":"morning_stretch","group":"morning","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"home","pose":"standing"},"end":{"location":"home","pose":"standing"},"tags":["morning","stretch","breathe"]},
+    {"id":"window_breathe","group":"window","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"window","pose":"standing"},"end":{"location":"window","pose":"standing"},"tags":["window","calm","breathe","day"]},
+    {"id":"pet_touch_calm","group":"pet","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"pet","pose":"crouch"},"end":{"location":"pet","pose":"crouch"},"tags":["pet","touch","calm"]},
+    {"id":"water_sip","group":"standing_idle","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"home","pose":"standing"},"end":{"location":"home","pose":"standing"},"tags":["water","hand","day"]},
+    {"id":"night_rest","group":"sofa_relax","type":"ambient","ready":false,"src":"","durationMs":6000,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"seated"},"tags":["night","calm","blink"]},
+
+    {"id":"transition_entry_to_sofa","group":"transition","type":"transition","ready":false,"src":"","durationMs":2500,"start":{"location":"entry","pose":"standing"},"end":{"location":"sofa","pose":"seated"},"tags":["walk","sit","return"]},
+    {"id":"transition_sofa_to_stand","group":"transition","type":"transition","ready":false,"src":"","durationMs":1800,"start":{"location":"sofa","pose":"seated"},"end":{"location":"sofa","pose":"standing"},"tags":["stand"]},
+    {"id":"transition_sofa_to_window","group":"transition","type":"transition","ready":false,"src":"","durationMs":2800,"start":{"location":"sofa","pose":"seated"},"end":{"location":"window","pose":"standing"},"tags":["stand","walk","window"]},
+    {"id":"transition_window_to_sofa","group":"transition","type":"transition","ready":false,"src":"","durationMs":2800,"start":{"location":"window","pose":"standing"},"end":{"location":"sofa","pose":"seated"},"tags":["walk","sit"]},
+    {"id":"transition_sofa_to_pet","group":"transition","type":"transition","ready":false,"src":"","durationMs":2400,"start":{"location":"sofa","pose":"seated"},"end":{"location":"pet","pose":"crouch"},"tags":["stand","walk","pet"]},
+    {"id":"transition_pet_to_sofa","group":"transition","type":"transition","ready":false,"src":"","durationMs":2400,"start":{"location":"pet","pose":"crouch"},"end":{"location":"sofa","pose":"seated"},"tags":["stand","walk","sit"]}
+  ]
+}
