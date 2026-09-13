@@ -2,8 +2,9 @@
 "use strict";
 const VERSION="v28-scene-library";
 const ASSET_REGISTRY="v29-scene-manager";
-const MANIFEST_URL="/scene-library-v28-manifest.json?v=28";
+const MANIFEST_URL="/scene-library-v28-manifest.json?v=30";
 const STATUS_URL="/api/scene-library/status";
+const PRELOAD_GROUPS=["morning","return_home","sofa_relax","window","pet","risk_calm","night","transition"];
 const byId=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let manifest=null,stage=null,videos=[],activeIndex=0,loaded=false,busy=false,cycleToken=0;
@@ -75,7 +76,7 @@ async function preloadScene(scene){
  if(!sceneReady(scene))return false;const cacheKey=`${scene.id}|${scene.assetUpdated||scene.src||""}`;if(sceneCache.has(cacheKey))return sceneCache.get(cacheKey);
  const p=(async()=>{const src=await sourceForScene(scene);if(!src)return false;return new Promise(resolve=>{const v=document.createElement("video");v.preload="metadata";v.muted=true;v.playsInline=true;v.src=src;const done=ok=>{v.onloadedmetadata=null;v.onerror=null;resolve(ok)};v.onloadedmetadata=()=>done(true);v.onerror=()=>done(false);try{v.load()}catch{done(false)}})})();sceneCache.set(cacheKey,p);return p
 }
-function preloadGroups(groups){for(const g of groups||[]){for(const s of groupScenes(g).filter(sceneReady).slice(0,3))preloadScene(s).catch(()=>{})}}
+function preloadGroups(groups){for(const g of groups||[]){for(const s of groupScenes(g).filter(sceneReady).slice(0,2))preloadScene(s).catch(()=>{})}}
 
 async function loadInto(v,scene){
  const src=await sourceForScene(scene);if(!src)return false;
@@ -87,7 +88,7 @@ async function loadInto(v,scene){
 
 async function playClip(scene,{keepStage=true}={}){
  if(!sceneReady(scene)||prefersReduced())return false;ensureStage();busy=true;const next=1-activeIndex,nv=videos[next],ov=videos[activeIndex];
- try{const ok=await loadInto(nv,scene);if(!ok)return false;activate(true);requestAnimationFrame(()=>{nv.classList.add("active");ov?.classList.remove("active")});setTimeout(()=>{try{ov?.pause()}catch{}},160);activeIndex=next;currentScene=scene.id;const maxMs=Math.max(1200,Number(scene.durationMs)||6000)+1200;await waitEnded(nv,maxMs);updateState(scene);lastPlayed=[scene.id,...lastPlayed.filter(x=>x!==scene.id)].slice(0,4);return true}
+ try{const ok=await loadInto(nv,scene);if(!ok)return false;activate(true);requestAnimationFrame(()=>{nv.classList.add("active");ov?.classList.remove("active")});setTimeout(()=>{try{ov?.pause()}catch{}},160);activeIndex=next;currentScene=scene.id;const maxMs=Math.max(1200,Number(scene.durationMs)||6000)+1200;await waitEnded(nv,maxMs);updateState(scene);lastPlayed=[scene.id,...lastPlayed.filter(x=>x!==scene.id)].slice(0,6);return true}
  finally{busy=false;if(!keepStage){pauseAll();activate(false)}}
 }
 
@@ -97,21 +98,21 @@ function pick(group,ctx={}){const list=groupScenes(group).filter(sceneReady).map
 async function fallbackFor(scene){const f=fm();if(!f)return false;const id=scene?.id||"";if(id==="transition_entry_to_sofa"||id==="transition_window_to_sofa"||id==="transition_pet_to_sofa"){const ok=await f.sit?.();currentLocation="sofa";currentPose="seated";return Boolean(ok)}if(id==="transition_sofa_to_stand"){const ok=await f.stand?.();currentLocation="sofa";currentPose="standing";return Boolean(ok)}if(id==="transition_sofa_to_window"){if(f.stand)await f.stand();if(f.playWalkTo)await f.playWalkTo(72);currentLocation="window";currentPose="standing";return true}if(id==="transition_sofa_to_pet"){const ok=await f.pet?.();currentLocation="pet";currentPose="crouch";return Boolean(ok)}if(scene?.group==="morning")return Boolean(await f.play?.("stretch"));if(scene?.group==="window")return Boolean(await f.play?.("look"));if(scene?.group==="pet")return Boolean(await f.pet?.());return Boolean(await f.idle?.())}
 
 async function playScene(id,{fallback=true,keepStage=false}={}){cycleToken++;const s=sceneById(id);if(!s)return false;if(sceneReady(s)){const ok=await playClip(s,{keepStage});if(ok)return true}if(fallback){activate(false);return fallbackFor(s)}return false}
-async function playGroupOnce(group,ctx={}){cycleToken++;const scene=pick(group,{location:currentLocation,pose:currentPose,...ctx});if(scene)return playClip(scene,{keepStage:false});const placeholder=groupScenes(group)[0];activate(false);return placeholder?fallbackFor(placeholder):false}
-async function startAmbient(group,ctx={}){const token=++cycleToken,ready=groupScenes(group).filter(sceneReady);if(!ready.length){activate(false);const placeholder=groupScenes(group)[0];return placeholder?fallbackFor(placeholder):false}while(token===cycleToken){const scene=pick(group,{location:currentLocation,pose:currentPose,...ctx});if(!scene)break;const ok=await playClip(scene,{keepStage:true});if(!ok)break;await sleep(40)}if(token===cycleToken){pauseAll();activate(false)}return true}
+async function playGroupOnce(group,ctx={}){cycleToken++;const chosen=pick(group,{location:currentLocation,pose:currentPose,...ctx});if(chosen)return playClip(chosen,{keepStage:false});const placeholder=groupScenes(group)[0];activate(false);return placeholder?fallbackFor(placeholder):false}
+async function startAmbient(group,ctx={}){const token=++cycleToken,ready=groupScenes(group).filter(sceneReady);if(!ready.length){activate(false);const placeholder=groupScenes(group)[0];return placeholder?fallbackFor(placeholder):false}while(token===cycleToken){const chosen=pick(group,{location:currentLocation,pose:currentPose,...ctx});if(!chosen)break;const ok=await playClip(chosen,{keepStage:true});if(!ok)break;await sleep(40)}if(token===cycleToken){pauseAll();activate(false)}return true}
 function findTransition(toLocation){const candidates=allScenes().filter(s=>s.type==="transition"&&s.end?.location===toLocation&&(!s.start?.location||s.start.location===currentLocation));return candidates.find(sceneReady)||candidates[0]||null}
 async function goTo(toLocation){cycleToken++;const s=findTransition(toLocation);if(!s)return false;if(sceneReady(s)){const ok=await playClip(s,{keepStage:false});if(ok)return true}activate(false);return fallbackFor(s)}
 async function runRoutine(name,ctx={}){cycleToken++;const steps=manifest?.routines?.[name];if(!Array.isArray(steps))return false;for(const step of steps){if(sceneById(step)){const ok=await playScene(step,{fallback:true,keepStage:false});if(!ok)return false;continue}if(groupScenes(step).length){startAmbient(step,ctx);return true}}return true}
 
-function contextForTime(t){const time=String(t||"");if(time==="morning")return {routine:"morning",group:"morning",tags:["morning"]};if(time==="return")return {routine:"return_home",group:"sofa_relax",tags:["return","evening"]};if(time==="night")return {group:"sofa_relax",tags:["night","calm"]};if(time==="day")return {group:currentLocation==="window"?"window":"standing_idle",tags:["day"]};return {group:currentPose==="seated"?"sofa_relax":"standing_idle",tags:["evening"]}}
-async function playContext(t){const c=contextForTime(t);if(c.routine)return runRoutine(c.routine,{time:t,tags:c.tags});return startAmbient(c.group,{time:t,tags:c.tags})}
+function contextForTime(t){const time=String(t||"");if(time==="morning")return {group:"morning",tags:["morning"]};if(time==="return")return {group:"return_home",tags:["return","evening"]};if(time==="night")return {group:"night",tags:["night","calm"]};if(time==="day")return {group:"window",tags:["day"]};return {group:"sofa_relax",tags:["evening"]}}
+async function playContext(t){const c=contextForTime(t);return startAmbient(c.group,{time:t,tags:c.tags})}
 
 async function loadManifest(){try{const r=await fetch(MANIFEST_URL,{cache:"no-store"});if(!r.ok)throw new Error(`scene manifest ${r.status}`);const d=await r.json();if(d?.version!==VERSION||d?.paidGeneration!==false||d?.freeOnly!==true)throw new Error("scene manifest policy mismatch");manifest=d;loaded=true;return true}catch(e){console.warn("scene v28 manifest",e);manifest=null;loaded=false;return false}}
-async function refreshAssets(){revokeObjectUrls();const ok=await syncRegisteredAssets();preloadGroups(["sofa_relax","morning","window","pet","transition"]);return {ok,readyScenes:readyCount()}}
+async function refreshAssets(){revokeObjectUrls();const ok=await syncRegisteredAssets();preloadGroups(PRELOAD_GROUPS);return {ok,readyScenes:readyCount()}}
 function stop(){cycleToken++;busy=false;pauseAll();activate(false);currentScene=""}
-function status(){return {version:VERSION,assetRegistry:ASSET_REGISTRY,loaded,readyScenes:readyCount(),currentScene,currentLocation,currentPose,busy,freeOnly:true}}
+function status(){return {version:VERSION,plannerVersion:manifest?.plannerVersion||"",assetRegistry:ASSET_REGISTRY,loaded,readyScenes:readyCount(),totalScenes:allScenes().length,currentScene,currentLocation,currentPose,busy,freeOnly:true}}
 
-async function boot(){addStyle();ensureStage();const ok=await loadManifest();if(!ok)return;await syncRegisteredAssets();preloadGroups(["sofa_relax","morning","window","pet","transition"]);window.sceneV28={version:VERSION,assetRegistry:ASSET_REGISTRY,status,manifest:()=>manifest,sceneById,playScene,playGroupOnce,startAmbient,goTo,runRoutine,playContext,stop,readyCount,refreshAssets};window.dispatchEvent(new CustomEvent("p2:scene-v28-ready",{detail:status()}))}
+async function boot(){addStyle();ensureStage();const ok=await loadManifest();if(!ok)return;await syncRegisteredAssets();preloadGroups(PRELOAD_GROUPS);window.sceneV28={version:VERSION,assetRegistry:ASSET_REGISTRY,status,manifest:()=>manifest,sceneById,playScene,playGroupOnce,startAmbient,goTo,runRoutine,playContext,stop,readyCount,refreshAssets};window.dispatchEvent(new CustomEvent("p2:scene-v28-ready",{detail:status()}))}
 window.addEventListener("beforeunload",()=>{stop();revokeObjectUrls()});
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1000),{once:true});else setTimeout(boot,1000);
 })();
