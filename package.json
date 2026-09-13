@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "check": "node preflight.mjs && node scripts/visual-hotfix-selfcheck.mjs && node scripts/motion-v26-selfcheck.mjs && node scripts/frame-motion-v27-selfcheck.mjs && node scripts/scene-library-v28-selfcheck.mjs && node scripts/scene-manager-v29-selfcheck.mjs && node scripts/scene-program-v30-selfcheck.mjs && node scripts/scene-batch-v31-selfcheck.mjs && node scripts/cinema-v23-selfcheck.mjs && node scripts/room-v25-selfcheck.mjs",
+    "check": "node preflight.mjs && node scripts/p3-control-selfcheck.mjs && node scripts/visual-hotfix-selfcheck.mjs && node scripts/motion-v26-selfcheck.mjs && node scripts/frame-motion-v27-selfcheck.mjs && node scripts/scene-library-v28-selfcheck.mjs && node scripts/scene-manager-v29-selfcheck.mjs && node scripts/scene-program-v30-selfcheck.mjs && node scripts/scene-batch-v31-selfcheck.mjs && node scripts/cinema-v23-selfcheck.mjs && node scripts/room-v25-selfcheck.mjs",
+    "check:p3": "node scripts/p3-control-selfcheck.mjs",
     "check:visual": "node scripts/visual-hotfix-selfcheck.mjs",
     "check:motion-v26": "node scripts/motion-v26-selfcheck.mjs",
     "check:frame-v27": "node scripts/frame-motion-v27-selfcheck.mjs",

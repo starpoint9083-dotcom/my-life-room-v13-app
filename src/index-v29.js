@@ -1,5 +1,6 @@
 import baseApp from "./index.js";
 import {handleSceneLibraryRoute,SCENE_LIBRARY_INFO} from "./scene-library.js";
+import {handleP3ControlRoute,P3_CONTROL_INFO} from "./p3-control.js";
 export {CinemaBatchWorkflow} from "./index.js";
 
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
@@ -25,6 +26,8 @@ async function injectSceneManager(request,response){
 export default {
  async fetch(request,env,ctx){
    const url=new URL(request.url);
+   if(url.pathname==="/api/p3/info"&&request.method==="GET")return json({ok:true,...P3_CONTROL_INFO,d1:Boolean(env.DB),r2:Boolean(env.AVATAR_ASSETS),ai:Boolean(env.AI)});
+   if(url.pathname.startsWith("/api/p3/")){const p3=await handleP3ControlRoute(request,env,ensureAuth,json);if(p3)return p3}
    if(url.pathname==="/api/scene-library/info"&&request.method==="GET")return json({ok:true,...SCENE_LIBRARY_INFO,d1:Boolean(env.DB),r2:Boolean(env.AVATAR_ASSETS)});
    if(url.pathname.startsWith("/api/scene-library/")){const scene=await handleSceneLibraryRoute(request,env,ensureAuth,json);if(scene)return scene}
    const response=await baseApp.fetch(request,env,ctx);return injectSceneManager(request,response)
