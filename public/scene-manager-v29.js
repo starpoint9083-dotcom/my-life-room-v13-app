@@ -1,0 +1,44 @@
+(()=>{
+"use strict";
+const VERSION="v29-scene-manager";
+const byId=id=>document.getElementById(id);
+const auth=extra=>{try{return typeof authHeaders==="function"?authHeaders(extra||{}):(extra||{})}catch{return extra||{}}};
+const qs=new URL(location.href).searchParams;
+if(qs.get("sceneSetup")!=="1")return;
+let manifest=null,assets=new Map(),busy=false;
+
+const LABELS={
+ sofa_relax_a:"소파에서 편하게 쉬기 1",sofa_relax_b:"소파에서 편하게 쉬기 2",sofa_pet_glance:"소파에서 펫 바라보기",sofa_window_glance:"소파에서 창밖 보기",sofa_phone_check:"소파에서 휴대폰 보기",sofa_deep_breathe:"소파에서 깊게 숨쉬기",standing_arrival_idle:"퇴근 후 현관에 서 있기",morning_stretch:"아침 스트레칭",window_breathe:"창가에서 숨 고르기",pet_touch_calm:"펫 쓰다듬기",water_sip:"물 한 모금",night_rest:"밤에 소파에서 쉬기",transition_entry_to_sofa:"현관 → 소파",transition_sofa_to_stand:"소파 → 일어서기",transition_sofa_to_window:"소파 → 창가",transition_window_to_sofa:"창가 → 소파",transition_sofa_to_pet:"소파 → 펫",transition_pet_to_sofa:"펫 → 소파"
+};
+const GROUP_LABELS={sofa_relax:"소파 생활",standing_idle:"서 있는 생활",morning:"아침",window:"창가",pet:"펫",transition:"연결 동작"};
+
+function addStyle(){if(byId("sceneManager29Style"))return;const s=document.createElement("style");s.id="sceneManager29Style";s.textContent=`
+ .sm29{position:fixed;inset:0;z-index:2147483000;background:#f7f4ef;color:#1f1c19;font-family:system-ui,-apple-system,sans-serif;overflow:auto;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+ .sm29Head{position:sticky;top:0;z-index:3;background:rgba(247,244,239,.96);backdrop-filter:blur(12px);padding:14px 16px 10px;border-bottom:1px solid #e7dfd4}
+ .sm29Top{display:flex;align-items:center;justify-content:space-between;gap:10px}.sm29Title{font-size:20px;font-weight:800}.sm29Close{border:0;background:#26211d;color:#fff;border-radius:12px;padding:9px 13px;font-weight:700}
+ .sm29Summary{margin-top:8px;font-size:13px;color:#6f645a}.sm29Bar{height:8px;background:#e5ded5;border-radius:999px;overflow:hidden;margin-top:8px}.sm29Bar>i{display:block;height:100%;background:#27221e;width:0;border-radius:999px}
+ .sm29Body{padding:12px 12px 30px;max-width:760px;margin:0 auto}.sm29Group{margin:17px 2px 8px;font-size:14px;font-weight:800;color:#4e443b}
+ .sm29Card{background:#fff;border:1px solid #e8e0d7;border-radius:17px;padding:13px;margin:8px 0;box-shadow:0 4px 16px rgba(52,41,31,.05)}
+ .sm29Row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.sm29Name{font-size:15px;font-weight:800}.sm29Meta{font-size:11px;color:#8a7d70;margin-top:3px}.sm29Status{font-size:11px;font-weight:800;border-radius:999px;padding:5px 8px;background:#eee7df;color:#756a5f;white-space:nowrap}.sm29Status.ready{background:#dff0e1;color:#2f6940}
+ .sm29Btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:11px}.sm29Btn{border:0;border-radius:11px;padding:10px 6px;font-size:12px;font-weight:800;background:#eee8e1;color:#312b26}.sm29Btn.primary{background:#27221e;color:#fff}.sm29Btn.danger{background:#f8e6e3;color:#8a302a}.sm29Btn:disabled{opacity:.45}.sm29Hint{font-size:11px;color:#8a7d70;margin-top:8px;line-height:1.45}
+ .sm29Toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483647;background:#201c19;color:#fff;padding:11px 14px;border-radius:12px;font-size:12px;max-width:85vw;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.22)}
+ `;document.head.appendChild(s)}
+function toast(msg){byId("sm29Toast")?.remove();const d=document.createElement("div");d.id="sm29Toast";d.className="sm29Toast";d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
+function sceneList(){return Array.isArray(manifest?.scenes)?manifest.scenes:[]}
+function targetText(s){return s.type==="transition"?`${Math.round((Number(s.durationMs)||2500)/100)/10}초 연결`:`약 ${Math.round((Number(s.durationMs)||6000)/1000)}초 생활`}
+function cardHtml(s){const a=assets.get(s.id),ready=a?.qc_status==="ready";return `<div class="sm29Card" data-scene="${s.id}"><div class="sm29Row"><div><div class="sm29Name">${LABELS[s.id]||s.id}</div><div class="sm29Meta">${targetText(s)} · ${s.id}</div></div><span class="sm29Status ${ready?"ready":""}">${ready?"준비됨":"비어 있음"}</span></div><div class="sm29Btns"><button class="sm29Btn primary" data-upload="${s.id}">${ready?"교체":"장면 넣기"}</button><button class="sm29Btn" data-preview="${s.id}" ${ready?"":"disabled"}>미리보기</button><button class="sm29Btn danger" data-delete="${s.id}" ${ready?"":"disabled"}>삭제</button></div><div class="sm29Hint">${s.type==="transition"?"걷기·앉기·일어나기처럼 장면 사이를 잇는 짧은 영상":"눈 깜빡임·숨쉬기·고개·손 움직임처럼 자연스러운 생활 장면"}</div></div>`}
+function render(){addStyle();let host=byId("sceneManager29");if(!host){host=document.createElement("div");host.id="sceneManager29";host.className="sm29";document.body.appendChild(host)}const total=sceneList().length,ready=[...assets.values()].filter(a=>a.qc_status==="ready").length,pct=total?Math.round(ready/total*100):0;const groups=[...new Set(sceneList().map(s=>s.group))];host.innerHTML=`<div class="sm29Head"><div class="sm29Top"><div class="sm29Title">생활장면 관리</div><button class="sm29Close" id="sm29Close">닫기</button></div><div class="sm29Summary">${ready}/${total}개 준비 · 장면 파일만 넣으면 자동 재생</div><div class="sm29Bar"><i style="width:${pct}%"></i></div></div><div class="sm29Body">${groups.map(g=>`<div class="sm29Group">${GROUP_LABELS[g]||g}</div>${sceneList().filter(s=>s.group===g).map(cardHtml).join("")}`).join("")}</div>`;wire()}
+function wire(){byId("sm29Close")?.addEventListener("click",()=>{window.sceneV28?.stop?.();byId("sceneManager29")?.remove();history.replaceState(null,"",location.pathname)});document.querySelectorAll("[data-upload]").forEach(b=>b.onclick=()=>chooseFile(b.dataset.upload));document.querySelectorAll("[data-preview]").forEach(b=>b.onclick=()=>preview(b.dataset.preview));document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>removeScene(b.dataset.delete))}
+
+async function readDuration(file){return new Promise((resolve,reject)=>{const v=document.createElement("video"),u=URL.createObjectURL(file),done=(ok,val)=>{URL.revokeObjectURL(u);v.remove();ok?resolve(val):reject(new Error(val))};v.preload="metadata";v.onloadedmetadata=()=>done(true,Math.round(v.duration*1000));v.onerror=()=>done(false,"영상 정보를 읽지 못했습니다");v.src=u})}
+function durationOk(scene,ms){return scene.type==="transition"?(ms>=700&&ms<=4500):(ms>=3000&&ms<=7500)}
+function chooseFile(id){if(busy)return;const scene=sceneList().find(s=>s.id===id);if(!scene)return;const input=document.createElement("input");input.type="file";input.accept="video/mp4,video/webm";input.onchange=async()=>{const file=input.files?.[0];if(!file)return;try{const ms=await readDuration(file);if(!durationOk(scene,ms)){toast(scene.type==="transition"?"연결 장면은 약 1~4초로 넣어주세요":"생활 장면은 약 3~7초로 넣어주세요");return}await upload(scene,file,ms)}catch(e){toast(e.message||"파일을 읽지 못했습니다")}};input.click()}
+async function upload(scene,file,durationMs){busy=true;toast("장면 저장 중…");try{const fd=new FormData();fd.append("scene_id",scene.id);fd.append("scene_type",scene.type);fd.append("duration_ms",String(durationMs));fd.append("video",file,file.name||`${scene.id}.mp4`);const r=await fetch("/api/scene-library/upload",{method:"POST",headers:auth(),body:fd});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||`저장 실패 (${r.status})`);await refresh();toast("저장 완료") }catch(e){toast(e.message||"저장 실패")}finally{busy=false}}
+async function preview(id){if(busy)return;const sc=window.sceneV28;if(!sc){toast("재생엔진이 아직 준비되지 않았습니다");return}sc.stop?.();const ok=await sc.playScene?.(id,{fallback:false,keepStage:false});if(!ok)toast("이 장면을 재생하지 못했습니다")}
+async function removeScene(id){if(busy)return;if(!confirm("이 장면을 삭제할까요?"))return;busy=true;try{const r=await fetch(`/api/scene-library/delete?scene_id=${encodeURIComponent(id)}`,{method:"DELETE",headers:auth()});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"삭제 실패");await refresh();toast("삭제했습니다") }catch(e){toast(e.message||"삭제 실패")}finally{busy=false}}
+async function fetchManifest(){const r=await fetch("/scene-library-v28-manifest.json?v=28",{cache:"no-store"});if(!r.ok)throw new Error("장면 목록을 불러오지 못했습니다");manifest=await r.json()}
+async function fetchAssets(){const r=await fetch("/api/scene-library/status",{headers:auth(),cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"저장된 장면을 불러오지 못했습니다");assets=new Map((d.assets||[]).map(a=>[a.scene_id,a]))}
+async function refresh(){await fetchAssets();await window.sceneV28?.refreshAssets?.();render()}
+async function boot(){try{await fetchManifest();await fetchAssets();render();window.sceneManagerV29={version:VERSION,refresh,assets:()=>assets,manifest:()=>manifest}}catch(e){toast(e.message||"장면 관리 시작 실패")}}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1300),{once:true});else setTimeout(boot,1300);
+})();
