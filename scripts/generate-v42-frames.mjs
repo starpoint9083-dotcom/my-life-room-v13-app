@@ -31,28 +31,35 @@ function selectedIndices(total,count){
   for(let i=1;i<=count;i++)out.push(Math.max(1,Math.min(total-2,Math.round(i*(total-1)/(count+1)))));
   return out;
 }
+function rawFrames(tmp){return fs.readdirSync(tmp).filter(x=>/^raw-\d+\.webp$/.test(x)).sort().map(x=>path.join(tmp,x))}
 function generateRaw(a,b,mode,tmp){
   const pattern=path.join(tmp,"raw-%03d.webp");
   if(mode==="flow"){
     const seq=path.join(tmp,"source-%03d.webp");
+    // minterpolate needs temporal context. Duplicate both anchors so the actual
+    // A→B transition lives between t=1s and t=2s with a frame on either side.
     fs.copyFileSync(a,path.join(tmp,"source-000.webp"));
-    fs.copyFileSync(b,path.join(tmp,"source-001.webp"));
+    fs.copyFileSync(a,path.join(tmp,"source-001.webp"));
+    fs.copyFileSync(b,path.join(tmp,"source-002.webp"));
+    fs.copyFileSync(b,path.join(tmp,"source-003.webp"));
     run("ffmpeg",[
       "-hide_banner","-loglevel","error","-y",
       "-framerate","1","-start_number","0","-i",seq,
-      "-vf","minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1",
-      "-t","1","-frames:v","24","-c:v","libwebp","-q:v","78","-compression_level","4",pattern
-    ],"V42 optical-flow interpolation");
+      "-vf","minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,trim=start=1:end=2,setpts=PTS-STARTPTS",
+      "-frames:v","24","-c:v","libwebp","-q:v","78","-compression_level","4",pattern
+    ],"V42 buffered optical-flow interpolation");
   }else{
     run("ffmpeg",[
       "-hide_banner","-loglevel","error","-y",
-      "-loop","1","-t","1","-i",a,
-      "-loop","1","-t","1","-i",b,
-      "-filter_complex","[0:v][1:v]xfade=transition=fade:duration=1:offset=0,fps=24",
-      "-t","1","-frames:v","24","-c:v","libwebp","-q:v","78","-compression_level","4",pattern
+      "-loop","1","-t","1.2","-i",a,
+      "-loop","1","-t","1.2","-i",b,
+      "-filter_complex","[0:v][1:v]xfade=transition=fade:duration=1:offset=0,fps=24,trim=start=0:end=1,setpts=PTS-STARTPTS",
+      "-frames:v","24","-c:v","libwebp","-q:v","78","-compression_level","4",pattern
     ],"V42 time-transition interpolation");
   }
-  return fs.readdirSync(tmp).filter(x=>/^raw-\d+\.webp$/.test(x)).sort().map(x=>path.join(tmp,x));
+  const frames=rawFrames(tmp);
+  if(frames.length<10)throw new Error(`V42 ${mode} interpolation produced only ${frames.length} frames; expected at least 10`);
+  return frames;
 }
 
 run("ffmpeg",["-version"],"ffmpeg availability");
@@ -70,9 +77,9 @@ for(const route of routes){
       const bytes=fs.statSync(dest).size;if(bytes<700)throw new Error(`Generated frame too small: ${dest} ${bytes}`);
       total+=bytes;
     });
-    console.log(`V42 ${route.id}: ${route.count} real intermediate images (${route.mode})`);
+    console.log(`V42 ${route.id}: ${route.count} real intermediate images (${route.mode}) from ${raw.length} buffered frames`);
   }finally{fs.rmSync(tmp,{recursive:true,force:true})}
 }
-const report={version:VERSION,routeCount:routes.length,frameCount:routes.reduce((a,r)=>a+r.count,0),bytes:total,fakeMotion:false,paidVideo:false,method:"ffmpeg optical-flow / still-frame interpolation"};
+const report={version:VERSION,routeCount:routes.length,frameCount:routes.reduce((a,r)=>a+r.count,0),bytes:total,fakeMotion:false,paidVideo:false,method:"ffmpeg buffered optical-flow / still-frame interpolation"};
 fs.writeFileSync(path.join(OUT_ROOT,"generation-report.json"),JSON.stringify(report,null,2));
 console.log(`P2 V42 FRAME GENERATION COMPLETE: routes=${report.routeCount} frames=${report.frameCount} bytes=${report.bytes}`);
