@@ -19,18 +19,9 @@ async function ensureAuth(request,env,allowCreate=true){
  else if(row.token_hash!==tokenHash)return {ok:false,response:json({ok:false,error:"Invalid device credentials"},403)};
  await env.DB.prepare("UPDATE device_auth SET last_seen_at=datetime('now') WHERE device_id=?1").bind(deviceId).run();return {ok:true,deviceId}
 }
+// V42 live room is master-only. Legacy motion engines remain in the repo for
+// compatibility/self-checks but are no longer injected into the user-facing room.
 const MOTION_STACK=[
- ["/frame-motion-v27.js","27"],
- ["/scene-runtime-v28.js","28"],
- ["/scene-manager-v29.js","29"],
- ["/scene-program-v30.js","30"],
- ["/master-motion-v32.js","32"],
- ["/master-motion-v33.js","33"],
- ["/master-motion-v34.js","34"],
- ["/master-motion-v35.js","35"],
- ["/master-motion-v36.js","36"],
- ["/motion-qc-v37.js","37"],
- ["/motion-auto-audit-v38.js","38"],
  ["/home-ui-v39.js","39"],
  ["/master-scenes-v40.js","40"],
  ["/master-frames-v42.js","42"]
@@ -40,13 +31,13 @@ async function injectSceneManager(request,response){
  const type=response.headers.get("content-type")||"";if(!type.includes("text/html"))return response;
  const html=await response.text();let bodyTags="",headTags="";
  if(!html.includes("/home-ui-v39.css"))headTags+='<link rel="stylesheet" href="/home-ui-v39.css?v=39">';
- if(!html.includes("/master-scenes-v40.css"))headTags+='<link rel="stylesheet" href="/master-scenes-v40.css?v=40">';
+ if(!html.includes("/master-scenes-v40.css"))headTags+='<link rel="stylesheet" href="/master-scenes-v40.css?v=42-master-only">';
  for(const [file,v] of MOTION_STACK)if(!html.includes(file))bodyTags+=`<script src="${file}?v=${v}" defer></script>`;
  let body=html;
  if(headTags)body=body.includes("</head>")?body.replace("</head>",headTags+"</head>"):headTags+body;
  if(bodyTags)body=body.includes("</body>")?body.replace("</body>",bodyTags+"</body>"):body+bodyTags;
  if(body===html)return new Response(html,response);
- const headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");
+ const headers=new Headers(response.headers);headers.set("cache-control","no-store, max-age=0");headers.delete("content-length");
  return new Response(body,{status:response.status,statusText:response.statusText,headers})
 }
 
