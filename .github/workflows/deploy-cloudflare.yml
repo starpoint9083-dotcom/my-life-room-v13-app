@@ -48,6 +48,7 @@ jobs:
           node --check scripts/verify-v22-live.mjs
           node --check scripts/verify-v23-cinema-live.mjs
           node --check scripts/verify-v26-live.mjs
+          node --check scripts/verify-v40-master-scenes-live.mjs
           node --check scripts/visual-hotfix-selfcheck.mjs
           node --check scripts/motion-v26-selfcheck.mjs
           node --check scripts/cinema-v23-selfcheck.mjs
@@ -56,7 +57,7 @@ jobs:
           node --check scripts/ai-autopilot.mjs
           npm audit --omit=dev --audit-level=high
 
-      - name: Ten-pass P2 V26 preflight and Wrangler dry-run
+      - name: Ten-pass P2 V40 preflight and Wrangler dry-run
         run: |
           set -euo pipefail
           for i in $(seq 1 10); do
@@ -91,3 +92,6 @@ jobs:
 
       - name: Verify deployed P2 V26 hybrid visuals and natural motion
         run: node scripts/verify-v26-live.mjs
+
+      - name: Verify deployed P2 V40 canonical master scenes
+        run: node scripts/verify-v40-master-scenes-live.mjs
