@@ -2,6 +2,10 @@ import fs from "node:fs";
 import {execFileSync} from "node:child_process";
 
 const s=JSON.parse(fs.readFileSync("deploy.settings.json","utf8"));
+const V40_MASTER_IDS=[
+  "master_01_sofa_relax","master_02_window_gaze","master_03_pet_touch","master_04_return_home",
+  "master_05_sit_down","master_06_walk_to_window","master_07_morning_life","master_08_night_rest"
+];
 
 function run(args,{allowFail=false}={}){
   try{
@@ -13,6 +17,23 @@ function run(args,{allowFail=false}={}){
     process.stderr.write(msg);
     if(!allowFail)throw e;
     return msg;
+  }
+}
+
+function seedV40Masters(){
+  const dir="seed/master-scenes-v40";
+  for(const id of V40_MASTER_IDS){
+    const file=`${dir}/${id}.webp`;
+    if(!fs.existsSync(file))throw new Error(`Missing V40 master seed: ${file}`);
+    console.log(`Seeding V40 master: ${id}`);
+    run([
+      "r2","object","put",`${s.r2_name}/master-scenes/v40/${id}.webp`,
+      "--file",file,
+      "--content-type","image/webp",
+      "--cache-control","public, max-age=86400",
+      "--remote",
+      "--force"
+    ]);
   }
 }
 
@@ -66,13 +87,16 @@ base.r2_buckets=[{
 }];
 fs.writeFileSync("wrangler.production.jsonc",JSON.stringify(base,null,2));
 
-console.log("\n5) Applying D1 migrations remotely");
+console.log("\n5) Seeding canonical P2 V40 master scenes into R2");
+seedV40Masters();
+
+console.log("\n6) Applying D1 migrations remotely");
 run(["d1","migrations","apply",s.d1_name,"--remote","--config","wrangler.production.jsonc"]);
 
-console.log("\n6) Local preflight");
+console.log("\n7) Local preflight");
 execFileSync("node",["preflight.mjs"],{stdio:"inherit"});
 
-console.log("\n7) Deploying new Worker");
+console.log("\n8) Deploying new Worker");
 const deployOut=run(["deploy","--config","wrangler.production.jsonc"]);
 
 const urlMatch=deployOut.match(/https:\/\/[A-Za-z0-9.-]+\.workers\.dev(?:\/\S*)?/);
