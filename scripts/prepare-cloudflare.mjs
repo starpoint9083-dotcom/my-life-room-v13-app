@@ -36,6 +36,13 @@ function seedV40Masters(){
     ]);
   }
 }
+function ensureV42Frames(){
+  const report="public/master-frames-v42/generation-report.json";
+  let valid=false;
+  try{const d=JSON.parse(fs.readFileSync(report,"utf8"));valid=d?.version==="v42-real-frame-sequence"&&d?.frameCount===64&&d?.fakeMotion===false&&d?.paidVideo===false}catch{}
+  if(valid){console.log("V42 intermediate images already prepared: 64 frames");return}
+  execFileSync("node",["scripts/generate-v42-frames.mjs"],{stdio:"inherit"});
+}
 
 console.log("=== My Life Room V13 Cloudflare prepare ===");
 console.log("1) Wrangler account check");
@@ -87,16 +94,19 @@ base.r2_buckets=[{
 }];
 fs.writeFileSync("wrangler.production.jsonc",JSON.stringify(base,null,2));
 
-console.log("\n5) Seeding canonical P2 V40 master scenes into R2");
+console.log("\n5) Preparing P2 V42 real intermediate images");
+ensureV42Frames();
+
+console.log("\n6) Seeding canonical P2 V40 master scenes into R2");
 seedV40Masters();
 
-console.log("\n6) Applying D1 migrations remotely");
+console.log("\n7) Applying D1 migrations remotely");
 run(["d1","migrations","apply",s.d1_name,"--remote","--config","wrangler.production.jsonc"]);
 
-console.log("\n7) Local preflight");
+console.log("\n8) Local preflight");
 execFileSync("node",["preflight.mjs"],{stdio:"inherit"});
 
-console.log("\n8) Deploying new Worker");
+console.log("\n9) Deploying new Worker");
 const deployOut=run(["deploy","--config","wrangler.production.jsonc"]);
 
 const urlMatch=deployOut.match(/https:\/\/[A-Za-z0-9.-]+\.workers\.dev(?:\/\S*)?/);
