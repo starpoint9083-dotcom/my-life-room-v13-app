@@ -32,7 +32,8 @@ const MOTION_STACK=[
  ["/motion-qc-v37.js","37"],
  ["/motion-auto-audit-v38.js","38"],
  ["/home-ui-v39.js","39"],
- ["/master-scenes-v40.js","40"]
+ ["/master-scenes-v40.js","40"],
+ ["/master-motion-v41.js","41"]
 ];
 async function injectSceneManager(request,response){
  if(request.method!=="GET"||!response?.ok)return response;
@@ -40,6 +41,7 @@ async function injectSceneManager(request,response){
  const html=await response.text();let bodyTags="",headTags="";
  if(!html.includes("/home-ui-v39.css"))headTags+='<link rel="stylesheet" href="/home-ui-v39.css?v=39">';
  if(!html.includes("/master-scenes-v40.css"))headTags+='<link rel="stylesheet" href="/master-scenes-v40.css?v=40">';
+ if(!html.includes("/master-motion-v41.css"))headTags+='<link rel="stylesheet" href="/master-motion-v41.css?v=41">';
  for(const [file,v] of MOTION_STACK)if(!html.includes(file))bodyTags+=`<script src="${file}?v=${v}" defer></script>`;
  let body=html;
  if(headTags)body=body.includes("</head>")?body.replace("</head>",headTags+"</head>"):headTags+body;
