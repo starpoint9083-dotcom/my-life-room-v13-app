@@ -1,0 +1,19 @@
+{
+  "version": "v42-real-frame-sequence",
+  "mode": "real-intermediate-images-only",
+  "fakeMotion": false,
+  "paidVideo": false,
+  "masterCount": 8,
+  "frameMs": 120,
+  "routes": [
+    {"id":"return_to_sit","from":"master_04_return_home","to":"master_05_sit_down","frames":["/master-frames-v42/return_to_sit/01.webp","/master-frames-v42/return_to_sit/02.webp","/master-frames-v42/return_to_sit/03.webp","/master-frames-v42/return_to_sit/04.webp","/master-frames-v42/return_to_sit/05.webp","/master-frames-v42/return_to_sit/06.webp","/master-frames-v42/return_to_sit/07.webp","/master-frames-v42/return_to_sit/08.webp"]},
+    {"id":"sit_to_relax","from":"master_05_sit_down","to":"master_01_sofa_relax","frames":["/master-frames-v42/sit_to_relax/01.webp","/master-frames-v42/sit_to_relax/02.webp","/master-frames-v42/sit_to_relax/03.webp","/master-frames-v42/sit_to_relax/04.webp","/master-frames-v42/sit_to_relax/05.webp","/master-frames-v42/sit_to_relax/06.webp"]},
+    {"id":"relax_to_pet","from":"master_01_sofa_relax","to":"master_03_pet_touch","frames":["/master-frames-v42/relax_to_pet/01.webp","/master-frames-v42/relax_to_pet/02.webp","/master-frames-v42/relax_to_pet/03.webp","/master-frames-v42/relax_to_pet/04.webp","/master-frames-v42/relax_to_pet/05.webp","/master-frames-v42/relax_to_pet/06.webp"]},
+    {"id":"pet_to_relax","from":"master_03_pet_touch","to":"master_01_sofa_relax","frames":["/master-frames-v42/pet_to_relax/01.webp","/master-frames-v42/pet_to_relax/02.webp","/master-frames-v42/pet_to_relax/03.webp","/master-frames-v42/pet_to_relax/04.webp","/master-frames-v42/pet_to_relax/05.webp","/master-frames-v42/pet_to_relax/06.webp"]},
+    {"id":"relax_to_walk","from":"master_01_sofa_relax","to":"master_06_walk_to_window","frames":["/master-frames-v42/relax_to_walk/01.webp","/master-frames-v42/relax_to_walk/02.webp","/master-frames-v42/relax_to_walk/03.webp","/master-frames-v42/relax_to_walk/04.webp","/master-frames-v42/relax_to_walk/05.webp","/master-frames-v42/relax_to_walk/06.webp","/master-frames-v42/relax_to_walk/07.webp","/master-frames-v42/relax_to_walk/08.webp"]},
+    {"id":"walk_to_window","from":"master_06_walk_to_window","to":"master_02_window_gaze","frames":["/master-frames-v42/walk_to_window/01.webp","/master-frames-v42/walk_to_window/02.webp","/master-frames-v42/walk_to_window/03.webp","/master-frames-v42/walk_to_window/04.webp","/master-frames-v42/walk_to_window/05.webp","/master-frames-v42/walk_to_window/06.webp","/master-frames-v42/walk_to_window/07.webp","/master-frames-v42/walk_to_window/08.webp"]},
+    {"id":"window_to_relax","from":"master_02_window_gaze","to":"master_01_sofa_relax","frames":["/master-frames-v42/window_to_relax/01.webp","/master-frames-v42/window_to_relax/02.webp","/master-frames-v42/window_to_relax/03.webp","/master-frames-v42/window_to_relax/04.webp","/master-frames-v42/window_to_relax/05.webp","/master-frames-v42/window_to_relax/06.webp","/master-frames-v42/window_to_relax/07.webp","/master-frames-v42/window_to_relax/08.webp"]},
+    {"id":"relax_to_night","from":"master_01_sofa_relax","to":"master_08_night_rest","frames":["/master-frames-v42/relax_to_night/01.webp","/master-frames-v42/relax_to_night/02.webp","/master-frames-v42/relax_to_night/03.webp","/master-frames-v42/relax_to_night/04.webp","/master-frames-v42/relax_to_night/05.webp","/master-frames-v42/relax_to_night/06.webp"]},
+    {"id":"night_to_morning","from":"master_08_night_rest","to":"master_07_morning_life","frames":["/master-frames-v42/night_to_morning/01.webp","/master-frames-v42/night_to_morning/02.webp","/master-frames-v42/night_to_morning/03.webp","/master-frames-v42/night_to_morning/04.webp","/master-frames-v42/night_to_morning/05.webp","/master-frames-v42/night_to_morning/06.webp","/master-frames-v42/night_to_morning/07.webp","/master-frames-v42/night_to_morning/08.webp"]}
+  ]
+}
