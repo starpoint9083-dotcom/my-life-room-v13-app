@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
 import {spawnSync} from "node:child_process";
 
 const VERSION="v42-real-frame-sequence";
@@ -10,9 +11,11 @@ const routes=[
   {id:"return_to_sit",from:"master_04_return_home",to:"master_05_sit_down",count:8,mode:"flow"},
   {id:"sit_to_relax",from:"master_05_sit_down",to:"master_01_sofa_relax",count:6,mode:"flow"},
   {id:"relax_to_pet",from:"master_01_sofa_relax",to:"master_03_pet_touch",count:6,mode:"flow"},
+  {id:"pet_to_walk",from:"master_03_pet_touch",to:"master_06_walk_to_window",count:8,mode:"flow"},
   {id:"pet_to_relax",from:"master_03_pet_touch",to:"master_01_sofa_relax",count:6,mode:"flow"},
   {id:"relax_to_walk",from:"master_01_sofa_relax",to:"master_06_walk_to_window",count:8,mode:"flow"},
   {id:"walk_to_window",from:"master_06_walk_to_window",to:"master_02_window_gaze",count:8,mode:"flow"},
+  {id:"window_to_sit",from:"master_02_window_gaze",to:"master_05_sit_down",count:8,mode:"flow"},
   {id:"window_to_relax",from:"master_02_window_gaze",to:"master_01_sofa_relax",count:8,mode:"flow"},
   {id:"relax_to_night",from:"master_01_sofa_relax",to:"master_08_night_rest",count:6,mode:"fade"},
   {id:"night_to_morning",from:"master_08_night_rest",to:"master_07_morning_life",count:8,mode:"fade"}
@@ -32,12 +35,11 @@ function selectedIndices(total,count){
   return out;
 }
 function rawFrames(tmp){return fs.readdirSync(tmp).filter(x=>/^raw-\d+\.webp$/.test(x)).sort().map(x=>path.join(tmp,x))}
+function hashFile(file){return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex")}
 function generateRaw(a,b,mode,tmp){
   const pattern=path.join(tmp,"raw-%03d.webp");
   if(mode==="flow"){
     const seq=path.join(tmp,"source-%03d.webp");
-    // minterpolate needs temporal context. Duplicate both anchors so the actual
-    // A→B transition lives between t=1s and t=2s with a frame on either side.
     fs.copyFileSync(a,path.join(tmp,"source-000.webp"));
     fs.copyFileSync(a,path.join(tmp,"source-001.webp"));
     fs.copyFileSync(b,path.join(tmp,"source-002.webp"));
@@ -45,16 +47,16 @@ function generateRaw(a,b,mode,tmp){
     run("ffmpeg",[
       "-hide_banner","-loglevel","error","-y",
       "-framerate","1","-start_number","0","-i",seq,
-      "-vf","minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,trim=start=1:end=2,setpts=PTS-STARTPTS",
-      "-frames:v","24","-c:v","libwebp","-q:v","78","-compression_level","4",pattern
-    ],"V42 buffered optical-flow interpolation");
+      "-vf","minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1:scd=none,trim=start=1:end=2,setpts=PTS-STARTPTS",
+      "-frames:v","24","-c:v","libwebp","-q:v","80","-compression_level","4",pattern
+    ],"V42 forced buffered optical-flow interpolation");
   }else{
     run("ffmpeg",[
       "-hide_banner","-loglevel","error","-y",
       "-loop","1","-t","1.2","-i",a,
       "-loop","1","-t","1.2","-i",b,
       "-filter_complex","[0:v][1:v]xfade=transition=fade:duration=1:offset=0,fps=24,trim=start=0:end=1,setpts=PTS-STARTPTS",
-      "-frames:v","24","-c:v","libwebp","-q:v","78","-compression_level","4",pattern
+      "-frames:v","24","-c:v","libwebp","-q:v","80","-compression_level","4",pattern
     ],"V42 time-transition interpolation");
   }
   const frames=rawFrames(tmp);
@@ -65,21 +67,26 @@ function generateRaw(a,b,mode,tmp){
 run("ffmpeg",["-version"],"ffmpeg availability");
 cleanDir(OUT_ROOT);
 let total=0;
+const routeReports=[];
 for(const route of routes){
   const outDir=path.join(OUT_ROOT,route.id);fs.mkdirSync(outDir,{recursive:true});
   const tmp=fs.mkdtempSync(path.join(os.tmpdir(),`p2-v42-${route.id}-`));
   try{
     const raw=generateRaw(master(route.from),master(route.to),route.mode,tmp);
-    const picks=selectedIndices(raw.length,route.count);
+    const picks=selectedIndices(raw.length,route.count),destFiles=[];
     picks.forEach((idx,i)=>{
       const dest=path.join(outDir,`${String(i+1).padStart(2,"0")}.webp`);
       fs.copyFileSync(raw[idx],dest);
       const bytes=fs.statSync(dest).size;if(bytes<700)throw new Error(`Generated frame too small: ${dest} ${bytes}`);
-      total+=bytes;
+      total+=bytes;destFiles.push(dest);
     });
-    console.log(`V42 ${route.id}: ${route.count} real intermediate images (${route.mode}) from ${raw.length} buffered frames`);
+    const uniqueFrames=new Set(destFiles.map(hashFile)).size;
+    const minUnique=Math.max(3,Math.ceil(route.count*.6));
+    if(uniqueFrames<minUnique)throw new Error(`V42 ${route.id} has only ${uniqueFrames}/${route.count} unique frames; need at least ${minUnique}`);
+    routeReports.push({id:route.id,mode:route.mode,frames:route.count,uniqueFrames});
+    console.log(`V42 ${route.id}: ${route.count} intermediate images, unique=${uniqueFrames}/${route.count} (${route.mode})`);
   }finally{fs.rmSync(tmp,{recursive:true,force:true})}
 }
-const report={version:VERSION,routeCount:routes.length,frameCount:routes.reduce((a,r)=>a+r.count,0),bytes:total,fakeMotion:false,paidVideo:false,method:"ffmpeg buffered optical-flow / still-frame interpolation"};
+const report={version:VERSION,routeCount:routes.length,frameCount:routes.reduce((a,r)=>a+r.count,0),bytes:total,fakeMotion:false,paidVideo:false,method:"ffmpeg forced buffered optical-flow / still-frame interpolation",qualityGate:"sha256 exact-frame uniqueness >= 60% per route",routes:routeReports};
 fs.writeFileSync(path.join(OUT_ROOT,"generation-report.json"),JSON.stringify(report,null,2));
-console.log(`P2 V42 FRAME GENERATION COMPLETE: routes=${report.routeCount} frames=${report.frameCount} bytes=${report.bytes}`);
+console.log(`P2 V42 FRAME GENERATION COMPLETE: routes=${report.routeCount} frames=${report.frameCount} bytes=${report.bytes} uniqueness-gate=PASS`);
