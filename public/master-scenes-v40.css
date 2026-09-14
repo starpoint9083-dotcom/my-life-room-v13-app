@@ -1,20 +1,20 @@
-/* P2 V40 canonical master-scene display layer — static masters only */
+/* P2 V42 master-only live room: canonical masters are the only visible room art */
+#room.master40-shell{
+ position:relative!important;
+ background:#211b17!important;
+ background-image:none!important;
+ overflow:hidden!important;
+}
 #room .masterScene40{
  position:absolute;inset:0;width:100%;height:100%;display:block;z-index:18;
- object-fit:cover;object-position:50% 50%;opacity:0;
- pointer-events:none;background:#241d18;
+ object-fit:cover;object-position:50% 50%;opacity:1!important;
+ pointer-events:none;background:#241d18;visibility:visible!important;
 }
-#room.master40-active .masterScene40{opacity:1}
-#room.master40-active>.roomArt,
-#room.master40-active>.window,
-#room.master40-active>.sun,
-#room.master40-active>.sofa,
-#room.master40-active>.rug,
-#room.master40-active>.table,
-#room.master40-active>.plant,
-#room.master40-active>.avatar,
-#room.master40-active>.pet,
-#room.master40-active>.sparkle{opacity:0!important;visibility:hidden!important}
-#room.master40-active>.badge{z-index:31}
+/* Old room/avatar/pet/fake-motion layers must never reappear behind the masters. */
+#room.master40-shell>*:not(.masterScene40):not(.badge){
+ opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+ animation:none!important;transition:none!important;transform:none!important;
+}
+#room.master40-shell>.badge{z-index:31;position:relative}
 #room.master40-loading:after{content:"";position:absolute;inset:0;z-index:17;background:rgba(255,250,244,.18);pointer-events:none}
-@media (max-width:440px){#home.home39 #room.master40-active{background:#211b17}}
+@media (max-width:440px){#home.home39 #room.master40-shell{background:#211b17!important}}
