@@ -29,15 +29,19 @@ const MOTION_STACK=[
  ["/master-motion-v35.js","35"],
  ["/master-motion-v36.js","36"],
  ["/motion-qc-v37.js","37"],
- ["/motion-auto-audit-v38.js","38"]
+ ["/motion-auto-audit-v38.js","38"],
+ ["/home-ui-v39.js","39"]
 ];
 async function injectSceneManager(request,response){
  if(request.method!=="GET"||!response?.ok)return response;
  const type=response.headers.get("content-type")||"";if(!type.includes("text/html"))return response;
- const html=await response.text();let tags="";
- for(const [file,v] of MOTION_STACK)if(!html.includes(file))tags+=`<script src="${file}?v=${v}" defer></script>`;
- if(!tags)return new Response(html,response);
- const body=html.includes("</body>")?html.replace("</body>",tags+"</body>"):html+tags;
+ const html=await response.text();let bodyTags="",headTags="";
+ if(!html.includes("/home-ui-v39.css"))headTags+='<link rel="stylesheet" href="/home-ui-v39.css?v=39">';
+ for(const [file,v] of MOTION_STACK)if(!html.includes(file))bodyTags+=`<script src="${file}?v=${v}" defer></script>`;
+ let body=html;
+ if(headTags)body=body.includes("</head>")?body.replace("</head>",headTags+"</head>"):headTags+body;
+ if(bodyTags)body=body.includes("</body>")?body.replace("</body>",bodyTags+"</body>"):body+bodyTags;
+ if(body===html)return new Response(html,response);
  const headers=new Headers(response.headers);headers.set("cache-control","no-cache");headers.delete("content-length");
  return new Response(body,{status:response.status,statusText:response.statusText,headers})
 }
