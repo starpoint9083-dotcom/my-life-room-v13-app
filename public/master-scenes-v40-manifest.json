@@ -4,14 +4,14 @@
   "paidGeneration": false,
   "masterCount": 8,
   "masters": [
-    {"id":"master_01_sofa_relax","label":"소파에서 쉬기","src":"/assets/master-scenes-v40/master_01_sofa_relax.webp","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"},
-    {"id":"master_02_window_gaze","label":"창밖 바라보기","src":"/assets/master-scenes-v40/master_02_window_gaze.webp","location":"window","pose":"seated","fit":"cover","position":"52% 50%"},
-    {"id":"master_03_pet_touch","label":"펫 쓰다듬기","src":"/assets/master-scenes-v40/master_03_pet_touch.webp","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"},
-    {"id":"master_04_return_home","label":"현관 귀가","src":"/assets/master-scenes-v40/master_04_return_home.webp","location":"entry","pose":"standing","fit":"cover","position":"44% 50%"},
-    {"id":"master_05_sit_down","label":"소파에 앉기","src":"/assets/master-scenes-v40/master_05_sit_down.webp","location":"sofa","pose":"seated","fit":"cover","position":"48% 50%"},
-    {"id":"master_06_walk_to_window","label":"창가로 걷기","src":"/assets/master-scenes-v40/master_06_walk_to_window.webp","location":"window","pose":"standing","fit":"cover","position":"56% 50%"},
-    {"id":"master_07_morning_life","label":"아침 생활","src":"/assets/master-scenes-v40/master_07_morning_life.webp","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"},
-    {"id":"master_08_night_rest","label":"밤 휴식","src":"/assets/master-scenes-v40/master_08_night_rest.webp","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"}
+    {"id":"master_01_sofa_relax","label":"소파에서 쉬기","src":"/api/master-scenes/file?id=master_01_sofa_relax","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"},
+    {"id":"master_02_window_gaze","label":"창밖 바라보기","src":"/api/master-scenes/file?id=master_02_window_gaze","location":"window","pose":"seated","fit":"cover","position":"52% 50%"},
+    {"id":"master_03_pet_touch","label":"펫 쓰다듬기","src":"/api/master-scenes/file?id=master_03_pet_touch","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"},
+    {"id":"master_04_return_home","label":"현관 귀가","src":"/api/master-scenes/file?id=master_04_return_home","location":"entry","pose":"standing","fit":"cover","position":"44% 50%"},
+    {"id":"master_05_sit_down","label":"소파에 앉기","src":"/api/master-scenes/file?id=master_05_sit_down","location":"sofa","pose":"seated","fit":"cover","position":"48% 50%"},
+    {"id":"master_06_walk_to_window","label":"창가로 걷기","src":"/api/master-scenes/file?id=master_06_walk_to_window","location":"window","pose":"standing","fit":"cover","position":"56% 50%"},
+    {"id":"master_07_morning_life","label":"아침 생활","src":"/api/master-scenes/file?id=master_07_morning_life","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"},
+    {"id":"master_08_night_rest","label":"밤 휴식","src":"/api/master-scenes/file?id=master_08_night_rest","location":"sofa","pose":"seated","fit":"cover","position":"50% 50%"}
   ],
   "timeMap": {
     "morning":"master_07_morning_life",
@@ -22,5 +22,5 @@
     "risk":"master_03_pet_touch",
     "night":"master_08_night_rest"
   },
-  "notes": "Canonical P2 master scene images. V34 maps all 50 scene slots to these 8 master IDs; V40 displays the corresponding canonical image in the room when a mapped master/slot plays."
+  "notes": "Canonical P2 master originals are stored privately in the existing R2 bucket and served read-only through /api/master-scenes/file. V34 maps all 50 scene slots to these 8 IDs; V40 shows the corresponding original inside the actual room screen."
 }
