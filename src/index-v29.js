@@ -1,6 +1,7 @@
 import baseApp from "./index.js";
 import {handleSceneLibraryRoute,SCENE_LIBRARY_INFO} from "./scene-library.js";
 import {handleP3ControlRoute,P3_CONTROL_INFO} from "./p3-control.js";
+import {handleMasterScenesRoute,MASTER_SCENES_INFO} from "./master-scenes.js";
 export {CinemaBatchWorkflow} from "./index.js";
 
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
@@ -30,13 +31,15 @@ const MOTION_STACK=[
  ["/master-motion-v36.js","36"],
  ["/motion-qc-v37.js","37"],
  ["/motion-auto-audit-v38.js","38"],
- ["/home-ui-v39.js","39"]
+ ["/home-ui-v39.js","39"],
+ ["/master-scenes-v40.js","40"]
 ];
 async function injectSceneManager(request,response){
  if(request.method!=="GET"||!response?.ok)return response;
  const type=response.headers.get("content-type")||"";if(!type.includes("text/html"))return response;
  const html=await response.text();let bodyTags="",headTags="";
  if(!html.includes("/home-ui-v39.css"))headTags+='<link rel="stylesheet" href="/home-ui-v39.css?v=39">';
+ if(!html.includes("/master-scenes-v40.css"))headTags+='<link rel="stylesheet" href="/master-scenes-v40.css?v=40">';
  for(const [file,v] of MOTION_STACK)if(!html.includes(file))bodyTags+=`<script src="${file}?v=${v}" defer></script>`;
  let body=html;
  if(headTags)body=body.includes("</head>")?body.replace("</head>",headTags+"</head>"):headTags+body;
@@ -54,6 +57,8 @@ export default {
    if(url.pathname.startsWith("/api/p3/")){const p3=await handleP3ControlRoute(request,env,ensureAuth,json);if(p3)return p3}
    if(url.pathname==="/api/scene-library/info"&&request.method==="GET")return json({ok:true,...SCENE_LIBRARY_INFO,d1:Boolean(env.DB),r2:Boolean(env.AVATAR_ASSETS)});
    if(url.pathname.startsWith("/api/scene-library/")){const scene=await handleSceneLibraryRoute(request,env,ensureAuth,json);if(scene)return scene}
+   if(url.pathname==="/api/master-scenes/info"&&request.method==="GET")return json({ok:true,...MASTER_SCENES_INFO,r2:Boolean(env.AVATAR_ASSETS)});
+   if(url.pathname.startsWith("/api/master-scenes/")){const masters=await handleMasterScenesRoute(request,env,ensureAuth,json);if(masters)return masters}
    const response=await baseApp.fetch(request,env,ctx);return injectSceneManager(request,response)
  }
 };
