@@ -59,7 +59,7 @@ for(let attempt=1;attempt<=12;attempt++){
 
     if(manifest.version!==VERSION||manifest.masterCount!==8||manifest.freeOnly!==true||manifest.paidGeneration!==false||!Array.isArray(manifest.masters)||manifest.masters.length!==8)throw new Error("V40 manifest mismatch");
     for(const id of IDS){const m=manifest.masters.find(x=>x.id===id);if(!m)throw new Error(`V40 manifest missing ${id}`);if(m.src!==`/api/master-scenes/file?id=${id}`)throw new Error(`V40 manifest route mismatch ${id}`)}
-    if(!runtime.body.includes(VERSION)||!runtime.body.includes("/api/master-scenes/file")||!runtime.body.includes("p2:master-scene-v40-show"))throw new Error("V40 runtime markers missing");
+    if(!runtime.body.includes(VERSION)||!runtime.body.includes("p2:master-scene-v40-show")||!runtime.body.includes("masterScene40"))throw new Error("V40 runtime markers missing");
     if(!css.body.includes("masterScene40")||!css.body.includes("master40-active"))throw new Error("V40 CSS markers missing");
 
     const sizes=[];
