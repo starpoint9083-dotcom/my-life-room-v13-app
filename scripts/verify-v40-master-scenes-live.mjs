@@ -48,8 +48,8 @@ for(let attempt=1;attempt<=12;attempt++){
       getJson("/api/master-scenes/info"),
       getJson("/api/master-scenes/status"),
       getJson("/master-scenes-v40-manifest.json?v=40"),
-      getText("/master-scenes-v40.js?v=40"),
-      getText("/master-scenes-v40.css?v=40")
+      getText("/master-scenes-v40.js?v=42-master-only"),
+      getText("/master-scenes-v40.css?v=42-master-only")
     ]);
 
     if(info.ok!==true||info.version!==VERSION||info.masterCount!==8||info.freeOnly!==true||info.paidGeneration!==false||info.r2!==true)throw new Error("V40 info mismatch");
@@ -59,20 +59,20 @@ for(let attempt=1;attempt<=12;attempt++){
 
     if(manifest.version!==VERSION||manifest.masterCount!==8||manifest.freeOnly!==true||manifest.paidGeneration!==false||!Array.isArray(manifest.masters)||manifest.masters.length!==8)throw new Error("V40 manifest mismatch");
     for(const id of IDS){const m=manifest.masters.find(x=>x.id===id);if(!m)throw new Error(`V40 manifest missing ${id}`);if(m.src!==`/api/master-scenes/file?id=${id}`)throw new Error(`V40 manifest route mismatch ${id}`)}
-    if(!runtime.body.includes(VERSION)||!runtime.body.includes("p2:master-scene-v40-show")||!runtime.body.includes("masterScene40"))throw new Error("V40 runtime markers missing");
-    if(!css.body.includes("masterScene40")||!css.body.includes("master40-active"))throw new Error("V40 CSS markers missing");
+    if(!runtime.body.includes(VERSION)||!runtime.body.includes("p2:master-scene-v40-show")||!runtime.body.includes("masterScene40")||!runtime.body.includes("master40-shell"))throw new Error("V40 master-only runtime markers missing");
+    if(!css.body.includes("masterScene40")||!css.body.includes("master40-shell")||!css.body.includes("Old room/avatar/pet/fake-motion layers must never reappear"))throw new Error("V40 master-only CSS markers missing");
 
     const sizes=[];
     for(const id of IDS)sizes.push(await getMasterFile(id));
     const totalBytes=sizes.reduce((a,b)=>a+b,0);
-    console.log(`PASS V40 live attempt ${attempt}/12 ready=${status.readyCount}/${status.total} files=8/8 bytes=${totalBytes}`);
-    console.log("DEPLOYMENT VERIFIED P2 V40: 8 CANONICAL R2 MASTERS + MANIFEST + RUNTIME + CSS + ACTUAL FILE RESPONSES, ZERO PAID GENERATION TRIGGERED");
+    console.log(`PASS V40 master-only live attempt ${attempt}/12 ready=${status.readyCount}/${status.total} files=8/8 bytes=${totalBytes}`);
+    console.log("DEPLOYMENT VERIFIED P2 V40 MASTER-ONLY: 8 CANONICAL R2 MASTERS + PINNED ROOM SHELL + LEGACY VISUAL LAYERS SUPPRESSED + ZERO PAID GENERATION");
     process.exit(0);
   }catch(error){
     last=error?.message||String(error);
-    console.log(`WAIT V40 live attempt ${attempt}/12 ${last}`);
+    console.log(`WAIT V40 master-only live attempt ${attempt}/12 ${last}`);
   }
   if(attempt<12)await sleep(5000);
 }
-console.error("P2 V40 live verification failed",last);
+console.error("P2 V40 master-only live verification failed",last);
 process.exit(1);
